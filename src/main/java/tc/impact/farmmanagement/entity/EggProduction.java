@@ -8,36 +8,34 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(
-        name = "egg_productions",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"animal_id", "date"})
-)
+@Table(name = "egg_productions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class EggProduction implements Production {
+public class EggProduction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "animal_id", nullable = false)
+    /**
+     * Either animal OR flock must be set (enforced in service layer).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "animal_id")
     private Animal animal;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "flock_id")
+    private Flock flock;
 
     @Column(nullable = false)
     private LocalDate date;
 
-    /**
-     * Number of good (sellable) eggs collected.
-     */
     @Column(name = "good_eggs", nullable = false)
     private Integer goodEggs = 0;
 
-    /**
-     * Number of cracked/broken eggs (still sellable at lower price or used internally).
-     */
-    @Column(name = "cracked_eggs")
+    @Column(name = "cracked_eggs", nullable = false)
     private Integer crackedEggs = 0;
 
     @Column(name = "total_eggs", nullable = false)
@@ -51,16 +49,29 @@ public class EggProduction implements Production {
         this.totalEggs = good + cracked;
     }
 
-    // ---------- Production interface ----------
+    // ---------- Convenience helpers ----------
 
-    @Override
-    public Double getQuantity() {
-        // Interface returns Double; we return pieces as double for uniform math.
-        return totalEggs.doubleValue();
+    public boolean hasAnimal() { return animal != null; }
+    public boolean hasFlock()  { return flock  != null;  }
+
+    /**
+     * Display name regardless of source type.
+     */
+    public String getSourceDisplayName() {
+        if (animal != null) return animal.getTagNumber() + " (Animal)";
+        if (flock != null)  return flock.getFlockCode() + " (Flock)";
+        return "Unknown";
     }
 
-    @Override
-    public String getUnit() {
-        return "piece";
+    public Long getSourceId() {
+        if (animal != null) return animal.getId();
+        if (flock != null)  return flock.getId();
+        return null;
+    }
+
+    public String getSourceType() {
+        if (animal != null) return "ANIMAL";
+        if (flock != null)  return "FLOCK";
+        return "NONE";
     }
 }
