@@ -1,0 +1,18 @@
+package tc.impact.farmmanagement.dto.response;
+
+import lombok.Data;
+
+import java.time.LocalDate;
+
+@Data
+public class MilkProductionResponse {
+    private Long id;
+    private Long animalId;
+    private String animalTagNumber;
+    private String animalName;
+    private LocalDate date;
+    private Double morningLiters;
+    private Double noonLiters;
+    private Double nightLiters;
+    private Double totalLiters;
+}
