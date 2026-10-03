@@ -10,7 +10,7 @@ import java.time.LocalDate;
 @Entity
 @Table(
         name = "categories",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"code", "type"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"farm_id", "code", "type"})
 )
 @Data
 @NoArgsConstructor
@@ -21,10 +21,10 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * Machine-readable code, e.g. FEED, MEDICINE, MILK.
-     * Unique per type.
-     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "farm_id", nullable = false)
+    private Farm farm;
+
     @Column(nullable = false, length = 50)
     private String code;
 

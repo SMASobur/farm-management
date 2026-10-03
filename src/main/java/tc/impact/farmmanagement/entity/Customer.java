@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "customers")
+@Table(
+        name = "customers",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"farm_id", "phone"})
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -17,6 +20,10 @@ public class Customer {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "farm_id", nullable = false)
+    private Farm farm;
 
     @Column(nullable = false)
     private String name;
@@ -43,11 +50,6 @@ public class Customer {
     }
 
     public enum CustomerType {
-        HOUSEHOLD,   // বাড়িতে ব্যবহারের জন্য
-        SHOP,        // দোকান
-        TEA_STALL,   // চায়ের দোকান
-        RESTAURANT,  // রেস্টুরেন্ট
-        WHOLESALER,  // পাইকার
-        OTHER
+        HOUSEHOLD, SHOP, TEA_STALL, RESTAURANT, WHOLESALER, OTHER
     }
 }

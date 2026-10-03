@@ -8,6 +8,7 @@ import tc.impact.farmmanagement.dto.response.DailyEggSummaryResponse;
 import tc.impact.farmmanagement.dto.response.EggProductionResponse;
 import tc.impact.farmmanagement.entity.Animal;
 import tc.impact.farmmanagement.entity.EggProduction;
+import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.entity.Flock;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
@@ -26,38 +27,39 @@ public class EggProductionService {
     private final EggProductionRepository eggRepository;
     private final AnimalRepository animalRepository;
     private final FlockRepository flockRepository;
-
-    // ============ Create ============
+    private final FarmContext farmContext;
 
     @Transactional
     public EggProductionResponse create(EggProductionRequest request) {
+        Farm farm = farmContext.getCurrentFarm();
         validateSource(request);
 
         EggProduction production = new EggProduction();
+        production.setFarm(farm);
         production.setDate(request.getDate());
         production.setGoodEggs(safe(request.getGoodEggs()));
         production.setCrackedEggs(safe(request.getCrackedEggs()));
 
         if (request.getAnimalId() != null) {
             Animal animal = animalRepository.findById(request.getAnimalId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Animal not found with id: " + request.getAnimalId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId()));
+            if (!animal.getFarm().getId().equals(farm.getId())) {
+                throw new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId());
+            }
             validateAnimalLaysEggs(animal);
-
-            if (eggRepository.existsByAnimalIdAndDate(animal.getId(), request.getDate())) {
-                throw new BusinessException("Egg entry already exists for animal '" +
-                        animal.getTagNumber() + "' on " + request.getDate());
+            if (eggRepository.existsByFarmIdAndAnimalIdAndDate(farm.getId(), animal.getId(), request.getDate())) {
+                throw new BusinessException("Egg entry already exists for animal '" + animal.getTagNumber() + "' on " + request.getDate());
             }
             production.setAnimal(animal);
         } else {
             Flock flock = flockRepository.findById(request.getFlockId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Flock not found with id: " + request.getFlockId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Flock not found with id: " + request.getFlockId()));
+            if (!flock.getFarm().getId().equals(farm.getId())) {
+                throw new ResourceNotFoundException("Flock not found with id: " + request.getFlockId());
+            }
             validateFlockLaysEggs(flock);
-
-            if (eggRepository.existsByFlockIdAndDate(flock.getId(), request.getDate())) {
-                throw new BusinessException("Egg entry already exists for flock '" +
-                        flock.getFlockCode() + "' on " + request.getDate());
+            if (eggRepository.existsByFarmIdAndFlockIdAndDate(farm.getId(), flock.getId(), request.getDate())) {
+                throw new BusinessException("Egg entry already exists for flock '" + flock.getFlockCode() + "' on " + request.getDate());
             }
             production.setFlock(flock);
         }
@@ -65,67 +67,66 @@ public class EggProductionService {
         return toResponse(eggRepository.save(production));
     }
 
-    // ============ Read ============
-
+    @Transactional(readOnly = true)
     public List<EggProductionResponse> getAll() {
-        return eggRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return eggRepository.findByFarmId(farmContext.getCurrentFarmId()).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public EggProductionResponse getById(Long id) {
         return toResponse(findOrThrow(id));
     }
 
+    @Transactional(readOnly = true)
     public List<EggProductionResponse> getByAnimal(Long animalId) {
-        return eggRepository.findByAnimalId(animalId).stream()
+        return eggRepository.findByFarmIdAndAnimalId(farmContext.getCurrentFarmId(), animalId).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<EggProductionResponse> getByFlock(Long flockId) {
-        return eggRepository.findByFlockId(flockId).stream()
+        return eggRepository.findByFarmIdAndFlockId(farmContext.getCurrentFarmId(), flockId).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<EggProductionResponse> getByDate(LocalDate date) {
-        return eggRepository.findByDate(date).stream()
+        return eggRepository.findByFarmIdAndDate(farmContext.getCurrentFarmId(), date).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<EggProductionResponse> getByRange(LocalDate from, LocalDate to) {
-        if (from.isAfter(to)) {
-            throw new BusinessException("'from' date cannot be after 'to' date");
-        }
-        return eggRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
+        if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
+        return eggRepository.findByFarmIdAndDateBetweenOrderByDateAsc(farmContext.getCurrentFarmId(), from, to).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
-
-    // ============ Update ============
 
     @Transactional
     public EggProductionResponse update(Long id, EggProductionRequest request) {
         EggProduction production = findOrThrow(id);
+        Long farmId = farmContext.getCurrentFarmId();
         validateSource(request);
 
-        // Source (animal/flock) cannot be changed on update — simpler & safer.
-        // If you need to change source, delete and recreate.
         if (request.getAnimalId() != null) {
             if (production.getAnimal() == null || !production.getAnimal().getId().equals(request.getAnimalId())) {
-                throw new BusinessException("Source cannot be changed on update. Delete and recreate if needed.");
+                throw new BusinessException("Source cannot be changed. Delete and recreate.");
             }
         } else {
             if (production.getFlock() == null || !production.getFlock().getId().equals(request.getFlockId())) {
-                throw new BusinessException("Source cannot be changed on update. Delete and recreate if needed.");
+                throw new BusinessException("Source cannot be changed. Delete and recreate.");
             }
         }
 
-        // Date change — check uniqueness under the new date
         if (!production.getDate().equals(request.getDate())) {
-            if (production.getAnimal() != null &&
-                    eggRepository.existsByAnimalIdAndDate(production.getAnimal().getId(), request.getDate())) {
-                throw new BusinessException("Egg entry already exists for this animal on " + request.getDate());
+            if (production.getAnimal() != null
+                    && eggRepository.existsByFarmIdAndAnimalIdAndDate(farmId, production.getAnimal().getId(), request.getDate())) {
+                throw new BusinessException("Egg entry already exists on " + request.getDate());
             }
-            if (production.getFlock() != null &&
-                    eggRepository.existsByFlockIdAndDate(production.getFlock().getId(), request.getDate())) {
-                throw new BusinessException("Egg entry already exists for this flock on " + request.getDate());
+            if (production.getFlock() != null
+                    && eggRepository.existsByFarmIdAndFlockIdAndDate(farmId, production.getFlock().getId(), request.getDate())) {
+                throw new BusinessException("Egg entry already exists on " + request.getDate());
             }
         }
 
@@ -136,73 +137,59 @@ public class EggProductionService {
         return toResponse(eggRepository.save(production));
     }
 
-    // ============ Delete ============
-
     @Transactional
     public void delete(Long id) {
-        if (!eggRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Egg entry not found with id: " + id);
-        }
-        eggRepository.deleteById(id);
+        EggProduction p = findOrThrow(id);
+        eggRepository.deleteById(p.getId());
     }
 
-    // ============ Summaries ============
-
+    @Transactional(readOnly = true)
     public Long getDailyTotal(LocalDate date) {
-        return eggRepository.sumEggsByDate(date);
+        return eggRepository.sumEggsByFarmAndDate(farmContext.getCurrentFarmId(), date);
     }
 
+    @Transactional(readOnly = true)
     public List<DailyEggSummaryResponse> getDailySummaries(LocalDate from, LocalDate to) {
-        return eggRepository.dailyTotalsBetween(from, to).stream()
+        return eggRepository.dailyTotalsBetween(farmContext.getCurrentFarmId(), from, to).stream()
                 .map(row -> new DailyEggSummaryResponse((LocalDate) row[0], ((Number) row[1]).longValue()))
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public Long getMonthlyTotal(int year, int month) {
         LocalDate from = LocalDate.of(year, month, 1);
         LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
-        return eggRepository.sumEggsBetween(from, to);
+        return eggRepository.sumEggsByFarmBetween(farmContext.getCurrentFarmId(), from, to);
     }
 
-    // ============ Helpers ============
-
     private EggProduction findOrThrow(Long id) {
-        return eggRepository.findById(id)
+        Long farmId = farmContext.getCurrentFarmId();
+        EggProduction p = eggRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Egg entry not found with id: " + id));
+        if (!p.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Egg entry not found with id: " + id);
+        }
+        return p;
     }
 
     private void validateSource(EggProductionRequest request) {
         boolean hasAnimal = request.getAnimalId() != null;
-        boolean hasFlock  = request.getFlockId()  != null;
-
-        if (!hasAnimal && !hasFlock) {
-            throw new BusinessException("Either animalId or flockId must be provided");
-        }
-        if (hasAnimal && hasFlock) {
-            throw new BusinessException("Only one of animalId or flockId can be provided, not both");
-        }
+        boolean hasFlock = request.getFlockId() != null;
+        if (!hasAnimal && !hasFlock) throw new BusinessException("Either animalId or flockId must be provided");
+        if (hasAnimal && hasFlock) throw new BusinessException("Only one of animalId or flockId can be provided");
     }
 
     private void validateAnimalLaysEggs(Animal animal) {
-        boolean isBird = animal.getSpecies() == Animal.Species.CHICKEN
-                || animal.getSpecies() == Animal.Species.DUCK;
-
-        if (!isBird) {
-            throw new BusinessException("Animal '" + animal.getTagNumber() + "' (" +
-                    animal.getSpecies() + ") does not lay eggs");
-        }
-        if (animal.getStatus() == Animal.AnimalStatus.DEAD
-                || animal.getStatus() == Animal.AnimalStatus.SOLD) {
-            throw new BusinessException("Cannot record eggs for animal '" +
-                    animal.getTagNumber() + "' with status " + animal.getStatus());
+        boolean isBird = animal.getSpecies() == Animal.Species.CHICKEN || animal.getSpecies() == Animal.Species.DUCK;
+        if (!isBird) throw new BusinessException("Animal '" + animal.getTagNumber() + "' does not lay eggs");
+        if (animal.getStatus() == Animal.AnimalStatus.DEAD || animal.getStatus() == Animal.AnimalStatus.SOLD) {
+            throw new BusinessException("Cannot record eggs for animal with status " + animal.getStatus());
         }
     }
 
     private void validateFlockLaysEggs(Flock flock) {
-        if (flock.getStatus() == Flock.FlockStatus.RETIRED
-                || flock.getStatus() == Flock.FlockStatus.SOLD) {
-            throw new BusinessException("Cannot record eggs for flock '" +
-                    flock.getFlockCode() + "' with status " + flock.getStatus());
+        if (flock.getStatus() == Flock.FlockStatus.RETIRED || flock.getStatus() == Flock.FlockStatus.SOLD) {
+            throw new BusinessException("Cannot record eggs for flock with status " + flock.getStatus());
         }
     }
 
@@ -219,13 +206,8 @@ public class EggProductionService {
         response.setTotalEggs(e.getTotalEggs());
         response.setSourceType(e.getSourceType());
         response.setSourceDisplayName(e.getSourceDisplayName());
-
-        if (e.getAnimal() != null) {
-            response.setAnimalId(e.getAnimal().getId());
-        }
-        if (e.getFlock() != null) {
-            response.setFlockId(e.getFlock().getId());
-        }
+        if (e.getAnimal() != null) response.setAnimalId(e.getAnimal().getId());
+        if (e.getFlock() != null) response.setFlockId(e.getFlock().getId());
         return response;
     }
 }

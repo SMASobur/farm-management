@@ -7,6 +7,7 @@ import tc.impact.farmmanagement.dto.request.MilkProductionRequest;
 import tc.impact.farmmanagement.dto.response.DailyMilkSummaryResponse;
 import tc.impact.farmmanagement.dto.response.MilkProductionResponse;
 import tc.impact.farmmanagement.entity.Animal;
+import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.entity.MilkProduction;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
@@ -23,24 +24,24 @@ public class MilkProductionService {
 
     private final MilkProductionRepository milkRepository;
     private final AnimalRepository animalRepository;
-
-    // ============ Create ============
+    private final FarmContext farmContext;
 
     @Transactional
     public MilkProductionResponse create(MilkProductionRequest request) {
+        Farm farm = farmContext.getCurrentFarm();
         Animal animal = animalRepository.findById(request.getAnimalId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Animal not found with id: " + request.getAnimalId()));
-
+                .orElseThrow(() -> new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId()));
+        if (!animal.getFarm().getId().equals(farm.getId())) {
+            throw new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId());
+        }
         validateAnimalCanProduceMilk(animal);
 
-        if (milkRepository.existsByAnimalIdAndDate(animal.getId(), request.getDate())) {
-            throw new BusinessException(
-                    "Milk entry already exists for " + animal.getTagNumber() +
-                            " on " + request.getDate());
+        if (milkRepository.existsByFarmIdAndAnimalIdAndDate(farm.getId(), animal.getId(), request.getDate())) {
+            throw new BusinessException("Milk entry already exists for " + animal.getTagNumber() + " on " + request.getDate());
         }
 
         MilkProduction production = new MilkProduction();
+        production.setFarm(farm);
         production.setAnimal(animal);
         production.setDate(request.getDate());
         production.setMorningLiters(safe(request.getMorningLiters()));
@@ -50,66 +51,55 @@ public class MilkProductionService {
         return toResponse(milkRepository.save(production));
     }
 
-    // ============ Read ============
-
+    @Transactional(readOnly = true)
     public List<MilkProductionResponse> getAll() {
-        return milkRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return milkRepository.findByFarmId(farmContext.getCurrentFarmId()).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public MilkProductionResponse getById(Long id) {
         return toResponse(findOrThrow(id));
     }
 
+    @Transactional(readOnly = true)
     public List<MilkProductionResponse> getByAnimal(Long animalId) {
-        if (!animalRepository.existsById(animalId)) {
-            throw new ResourceNotFoundException("Animal not found with id: " + animalId);
-        }
-        return milkRepository.findByAnimalId(animalId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return milkRepository.findByFarmIdAndAnimalId(farmContext.getCurrentFarmId(), animalId).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<MilkProductionResponse> getByDate(LocalDate date) {
-        return milkRepository.findByDate(date).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return milkRepository.findByFarmIdAndDate(farmContext.getCurrentFarmId(), date).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<MilkProductionResponse> getByRange(LocalDate from, LocalDate to) {
-        if (from.isAfter(to)) {
-            throw new BusinessException("'from' date cannot be after 'to' date");
-        }
-        return milkRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
+        return milkRepository.findByFarmIdAndDateBetweenOrderByDateAsc(farmContext.getCurrentFarmId(), from, to).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
-
-    // ============ Update ============
 
     @Transactional
     public MilkProductionResponse update(Long id, MilkProductionRequest request) {
         MilkProduction production = findOrThrow(id);
+        Long farmId = farmContext.getCurrentFarmId();
 
-        // If the animal is changing, validate the new animal + uniqueness
         if (!production.getAnimal().getId().equals(request.getAnimalId())) {
             Animal newAnimal = animalRepository.findById(request.getAnimalId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Animal not found with id: " + request.getAnimalId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId()));
+            if (!newAnimal.getFarm().getId().equals(farmId)) {
+                throw new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId());
+            }
             validateAnimalCanProduceMilk(newAnimal);
-
-            if (milkRepository.existsByAnimalIdAndDate(newAnimal.getId(), request.getDate())) {
-                throw new BusinessException(
-                        "Milk entry already exists for " + newAnimal.getTagNumber() +
-                                " on " + request.getDate());
+            if (milkRepository.existsByFarmIdAndAnimalIdAndDate(farmId, newAnimal.getId(), request.getDate())) {
+                throw new BusinessException("Milk entry already exists for " + newAnimal.getTagNumber() + " on " + request.getDate());
             }
             production.setAnimal(newAnimal);
         } else if (!production.getDate().equals(request.getDate())
-                && milkRepository.existsByAnimalIdAndDate(production.getAnimal().getId(), request.getDate())) {
-            throw new BusinessException(
-                    "Milk entry already exists for " + production.getAnimal().getTagNumber() +
-                            " on " + request.getDate());
+                && milkRepository.existsByFarmIdAndAnimalIdAndDate(farmId, production.getAnimal().getId(), request.getDate())) {
+            throw new BusinessException("Milk entry already exists for " + production.getAnimal().getTagNumber() + " on " + request.getDate());
         }
 
         production.setDate(request.getDate());
@@ -117,60 +107,53 @@ public class MilkProductionService {
         production.setNoonLiters(safe(request.getNoonLiters()));
         production.setNightLiters(safe(request.getNightLiters()));
 
-        // @PreUpdate will recalculate totalLiters
         return toResponse(milkRepository.save(production));
     }
 
-    // ============ Delete ============
-
     @Transactional
     public void delete(Long id) {
-        if (!milkRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Milk entry not found with id: " + id);
-        }
-        milkRepository.deleteById(id);
+        MilkProduction production = findOrThrow(id);
+        milkRepository.deleteById(production.getId());
     }
 
-    // ============ Summaries ============
-
+    @Transactional(readOnly = true)
     public Double getDailyTotal(LocalDate date) {
-        return milkRepository.sumLitersByDate(date);
+        return milkRepository.sumLitersByFarmAndDate(farmContext.getCurrentFarmId(), date);
     }
 
+    @Transactional(readOnly = true)
     public List<DailyMilkSummaryResponse> getDailySummaries(LocalDate from, LocalDate to) {
-        return milkRepository.dailyTotalsBetween(from, to).stream()
+        return milkRepository.dailyTotalsBetween(farmContext.getCurrentFarmId(), from, to).stream()
                 .map(row -> new DailyMilkSummaryResponse((LocalDate) row[0], (Double) row[1]))
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public Double getMonthlyTotal(int year, int month) {
         LocalDate from = LocalDate.of(year, month, 1);
         LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
-        return milkRepository.sumLitersBetween(from, to);
+        return milkRepository.sumLitersByFarmBetween(farmContext.getCurrentFarmId(), from, to);
     }
 
-    // ============ Helpers ============
-
     private MilkProduction findOrThrow(Long id) {
-        return milkRepository.findById(id)
+        Long farmId = farmContext.getCurrentFarmId();
+        MilkProduction p = milkRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Milk entry not found with id: " + id));
+        if (!p.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Milk entry not found with id: " + id);
+        }
+        return p;
     }
 
     private void validateAnimalCanProduceMilk(Animal animal) {
         if (!animal.isMilkProducer()) {
-            throw new BusinessException(
-                    "Animal '" + animal.getTagNumber() + "' (" + animal.getSpecies() +
-                            ") does not produce milk");
+            throw new BusinessException("Animal '" + animal.getTagNumber() + "' (" + animal.getSpecies() + ") does not produce milk");
         }
-        if (animal.getStatus() == Animal.AnimalStatus.DEAD
-                || animal.getStatus() == Animal.AnimalStatus.SOLD) {
-            throw new BusinessException(
-                    "Cannot record milk for animal '" + animal.getTagNumber() +
-                            "' with status " + animal.getStatus());
+        if (animal.getStatus() == Animal.AnimalStatus.DEAD || animal.getStatus() == Animal.AnimalStatus.SOLD) {
+            throw new BusinessException("Cannot record milk for animal '" + animal.getTagNumber() + "' with status " + animal.getStatus());
         }
         if (animal.getStatus() == Animal.AnimalStatus.DRY) {
-            throw new BusinessException(
-                    "Animal '" + animal.getTagNumber() + "' is marked DRY (not producing milk)");
+            throw new BusinessException("Animal '" + animal.getTagNumber() + "' is marked DRY");
         }
     }
 

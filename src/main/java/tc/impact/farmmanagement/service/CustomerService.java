@@ -2,9 +2,11 @@ package tc.impact.farmmanagement.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tc.impact.farmmanagement.dto.request.CustomerRequest;
 import tc.impact.farmmanagement.dto.response.CustomerResponse;
 import tc.impact.farmmanagement.entity.Customer;
+import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.CustomerRepository;
@@ -19,18 +21,22 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final SaleRepository saleRepository;
+    private final FarmContext farmContext;
 
-    // ============ Create ============
-
+    @Transactional
     public CustomerResponse create(CustomerRequest request) {
-        if (request.getPhone() != null && !request.getPhone().isBlank()
-                && customerRepository.existsByPhone(request.getPhone())) {
-            throw new BusinessException("Customer with phone '" + request.getPhone() + "' already exists");
+        Farm farm = farmContext.getCurrentFarm();
+        String normalizedPhone = normalizePhone(request.getPhone());
+
+        if (normalizedPhone != null
+                && customerRepository.existsByFarmIdAndPhone(farm.getId(), normalizedPhone)) {
+            throw new BusinessException("Customer with phone '" + normalizedPhone + "' already exists");
         }
 
         Customer customer = new Customer();
+        customer.setFarm(farm);
         customer.setName(request.getName());
-        customer.setPhone(normalizePhone(request.getPhone()));
+        customer.setPhone(normalizedPhone);
         customer.setAddress(request.getAddress());
         customer.setType(request.getType() != null ? request.getType() : Customer.CustomerType.HOUSEHOLD);
         customer.setNotes(request.getNotes());
@@ -38,44 +44,48 @@ public class CustomerService {
         return toResponse(customerRepository.save(customer));
     }
 
-    // ============ Read ============
-
+    @Transactional(readOnly = true)
     public List<CustomerResponse> getAll() {
-        return customerRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return customerRepository.findByFarmId(farmId).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public CustomerResponse getById(Long id) {
+        Long farmId = farmContext.getCurrentFarmId();
         Customer customer = findOrThrow(id);
         CustomerResponse response = toResponse(customer);
-        response.setTotalDue(customerRepository.sumDueByCustomer(id));
+        response.setTotalDue(saleRepository.sumDueByCustomerAndFarm(id, farmId));
         return response;
     }
 
+    @Transactional(readOnly = true)
     public List<CustomerResponse> searchByName(String namePart) {
-        return customerRepository.findByNameContainingIgnoreCase(namePart).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return customerRepository.findByFarmIdAndNameContainingIgnoreCase(farmId, namePart).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<CustomerResponse> getByType(Customer.CustomerType type) {
-        return customerRepository.findByType(type).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return customerRepository.findByFarmIdAndType(farmId, type).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ============ Update ============
-
+    @Transactional
     public CustomerResponse update(Long id, CustomerRequest request) {
+        Long farmId = farmContext.getCurrentFarmId();
         Customer customer = findOrThrow(id);
 
-        if (request.getPhone() != null && !request.getPhone().isBlank()) {
-            String normalized = normalizePhone(request.getPhone());
-            if (!normalized.equals(customer.getPhone()) && customerRepository.existsByPhone(normalized)) {
-                throw new BusinessException("Customer with phone '" + normalized + "' already exists");
+        String normalizedPhone = normalizePhone(request.getPhone());
+        if (normalizedPhone != null) {
+            if (!normalizedPhone.equals(customer.getPhone())
+                    && customerRepository.existsByFarmIdAndPhone(farmId, normalizedPhone)) {
+                throw new BusinessException("Customer with phone '" + normalizedPhone + "' already exists");
             }
-            customer.setPhone(normalized);
+            customer.setPhone(normalizedPhone);
         } else {
             customer.setPhone(null);
         }
@@ -88,25 +98,27 @@ public class CustomerService {
         return toResponse(customerRepository.save(customer));
     }
 
-    // ============ Delete ============
-
+    @Transactional
     public void delete(Long id) {
+        Long farmId = farmContext.getCurrentFarmId();
         Customer customer = findOrThrow(id);
-        // Safety check: don't allow deleting a customer with outstanding sales
-        long saleCount = saleRepository.findByCustomerId(id).size();
+        long saleCount = saleRepository.findByFarmIdAndCustomerId(farmId, id).size();
         if (saleCount > 0) {
             throw new BusinessException(
                     "Cannot delete customer '" + customer.getName() +
-                            "' — they have " + saleCount + " sale(s) on record. Delete the sales first.");
+                            "' — they have " + saleCount + " sale(s) on record.");
         }
         customerRepository.deleteById(id);
     }
 
-    // ============ Helpers ============
-
     private Customer findOrThrow(Long id) {
-        return customerRepository.findById(id)
+        Long farmId = farmContext.getCurrentFarmId();
+        Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
+        if (!customer.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Customer not found with id: " + id);
+        }
+        return customer;
     }
 
     private String normalizePhone(String phone) {

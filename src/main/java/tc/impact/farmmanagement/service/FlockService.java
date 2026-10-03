@@ -2,8 +2,10 @@ package tc.impact.farmmanagement.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tc.impact.farmmanagement.dto.request.FlockRequest;
 import tc.impact.farmmanagement.dto.response.FlockResponse;
+import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.entity.Flock;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
@@ -17,13 +19,18 @@ import java.util.stream.Collectors;
 public class FlockService {
 
     private final FlockRepository flockRepository;
+    private final FarmContext farmContext;
 
+    @Transactional
     public FlockResponse create(FlockRequest request) {
-        if (flockRepository.existsByFlockCode(request.getFlockCode())) {
+        Farm farm = farmContext.getCurrentFarm();
+
+        if (flockRepository.existsByFarmIdAndFlockCode(farm.getId(), request.getFlockCode())) {
             throw new BusinessException("Flock with code '" + request.getFlockCode() + "' already exists");
         }
 
         Flock flock = new Flock();
+        flock.setFarm(farm);
         flock.setFlockCode(request.getFlockCode());
         flock.setName(request.getName());
         flock.setSpecies(request.getSpecies());
@@ -34,23 +41,32 @@ public class FlockService {
         return toResponse(flockRepository.save(flock));
     }
 
+    @Transactional(readOnly = true)
     public List<FlockResponse> getAll() {
-        return flockRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return flockRepository.findByFarmId(farmId).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public FlockResponse getById(Long id) {
         return toResponse(findOrThrow(id));
     }
 
+    @Transactional(readOnly = true)
     public List<FlockResponse> getBySpecies(Flock.Species species) {
-        return flockRepository.findBySpecies(species).stream().map(this::toResponse).collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return flockRepository.findByFarmIdAndSpecies(farmId, species).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional
     public FlockResponse update(Long id, FlockRequest request) {
+        Long farmId = farmContext.getCurrentFarmId();
         Flock flock = findOrThrow(id);
 
         if (!flock.getFlockCode().equals(request.getFlockCode())
-                && flockRepository.existsByFlockCode(request.getFlockCode())) {
+                && flockRepository.existsByFarmIdAndFlockCode(farmId, request.getFlockCode())) {
             throw new BusinessException("Flock with code '" + request.getFlockCode() + "' already exists");
         }
 
@@ -64,16 +80,20 @@ public class FlockService {
         return toResponse(flockRepository.save(flock));
     }
 
+    @Transactional
     public void delete(Long id) {
-        if (!flockRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Flock not found with id: " + id);
-        }
-        flockRepository.deleteById(id);
+        Flock flock = findOrThrow(id);
+        flockRepository.deleteById(flock.getId());
     }
 
     Flock findOrThrow(Long id) {
-        return flockRepository.findById(id)
+        Long farmId = farmContext.getCurrentFarmId();
+        Flock flock = flockRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Flock not found with id: " + id));
+        if (!flock.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Flock not found with id: " + id);
+        }
+        return flock;
     }
 
     private FlockResponse toResponse(Flock flock) {

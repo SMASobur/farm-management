@@ -13,19 +13,14 @@ import java.util.Optional;
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
-    Optional<Customer> findByPhone(String phone);
+    List<Customer> findByFarmId(Long farmId);
 
-    boolean existsByPhone(String phone);
+    Optional<Customer> findByFarmIdAndPhone(Long farmId, String phone);
 
-    List<Customer> findByType(Customer.CustomerType type);
+    boolean existsByFarmIdAndPhone(Long farmId, String phone);
 
-    List<Customer> findByNameContainingIgnoreCase(String namePart);
+    List<Customer> findByFarmIdAndType(Long farmId, Customer.CustomerType type);
 
-    // ============ Aggregation ============
+    List<Customer> findByFarmIdAndNameContainingIgnoreCase(Long farmId, String namePart);
 
-    /**
-     * Total outstanding due for a specific customer across all their sales.
-     */
-    @Query("SELECT COALESCE(SUM(s.dueAmount), 0) FROM Sale s WHERE s.customer.id = :customerId")
-    BigDecimal sumDueByCustomer(@Param("customerId") Long customerId);
 }

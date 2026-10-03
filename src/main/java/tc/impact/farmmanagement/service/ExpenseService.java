@@ -9,6 +9,7 @@ import tc.impact.farmmanagement.dto.response.DailyExpenseSummaryResponse;
 import tc.impact.farmmanagement.dto.response.ExpenseResponse;
 import tc.impact.farmmanagement.entity.Category;
 import tc.impact.farmmanagement.entity.Expense;
+import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.CategoryRepository;
@@ -26,14 +27,15 @@ public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final CategoryRepository categoryRepository;
-
-    // ============ Create ============
+    private final FarmContext farmContext;
 
     @Transactional
     public ExpenseResponse create(ExpenseRequest request) {
-        Category category = loadCategory(request.getCategoryId());
+        Farm farm = farmContext.getCurrentFarm();
+        Category category = loadCategory(request.getCategoryId(), farm.getId());
 
         Expense expense = new Expense();
+        expense.setFarm(farm);
         expense.setDate(request.getDate() != null ? request.getDate() : LocalDate.now());
         expense.setCategory(category);
         expense.setDescription(request.getDescription());
@@ -43,11 +45,11 @@ public class ExpenseService {
         return toResponse(expenseRepository.save(expense));
     }
 
-    // ============ Read ============
-
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getAll() {
-        return expenseRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return expenseRepository.findByFarmId(farmId).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -57,35 +59,39 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getByDate(LocalDate date) {
-        return expenseRepository.findByDate(date).stream().map(this::toResponse).collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return expenseRepository.findByFarmIdAndDate(farmId, date).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getByRange(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
-        return expenseRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
+        Long farmId = farmContext.getCurrentFarmId();
+        return expenseRepository.findByFarmIdAndDateBetweenOrderByDateAsc(farmId, from, to).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getByCategory(Long categoryId) {
-        return expenseRepository.findByCategoryId(categoryId).stream()
+        Long farmId = farmContext.getCurrentFarmId();
+        return expenseRepository.findByFarmIdAndCategoryId(farmId, categoryId).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getByCategoryAndRange(Long categoryId, LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
-        return expenseRepository.findByCategoryIdAndDateBetweenOrderByDateAsc(categoryId, from, to).stream()
+        Long farmId = farmContext.getCurrentFarmId();
+        return expenseRepository.findByFarmIdAndCategoryIdAndDateBetweenOrderByDateAsc(farmId, categoryId, from, to).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ============ Update ============
-
     @Transactional
     public ExpenseResponse update(Long id, ExpenseRequest request) {
+        Long farmId = farmContext.getCurrentFarmId();
         Expense expense = findOrThrow(id);
-        Category category = loadCategory(request.getCategoryId());
+        Category category = loadCategory(request.getCategoryId(), farmId);
 
         expense.setDate(request.getDate() != null ? request.getDate() : expense.getDate());
         expense.setCategory(category);
@@ -96,31 +102,25 @@ public class ExpenseService {
         return toResponse(expenseRepository.save(expense));
     }
 
-    // ============ Delete ============
-
     @Transactional
     public void delete(Long id) {
-        if (!expenseRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Expense not found with id: " + id);
-        }
-        expenseRepository.deleteById(id);
+        Expense expense = findOrThrow(id);
+        expenseRepository.deleteById(expense.getId());
     }
-
-    // ============ Summaries ============
 
     @Transactional(readOnly = true)
     public BigDecimal getDailyTotal(LocalDate date) {
-        return expenseRepository.sumAmountByDate(date);
+        return expenseRepository.sumAmountByFarmAndDate(farmContext.getCurrentFarmId(), date);
     }
 
     @Transactional(readOnly = true)
     public BigDecimal getTotalBetween(LocalDate from, LocalDate to) {
-        return expenseRepository.sumAmountBetween(from, to);
+        return expenseRepository.sumAmountByFarmBetween(farmContext.getCurrentFarmId(), from, to);
     }
 
     @Transactional(readOnly = true)
     public List<DailyExpenseSummaryResponse> getDailySummaries(LocalDate from, LocalDate to) {
-        return expenseRepository.dailyTotalsBetween(from, to).stream()
+        return expenseRepository.dailyTotalsBetween(farmContext.getCurrentFarmId(), from, to).stream()
                 .map(row -> new DailyExpenseSummaryResponse(
                         (LocalDate) row[0],
                         ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP)))
@@ -129,21 +129,19 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public List<CategoryExpenseSummaryResponse> getCategorySummaries(LocalDate from, LocalDate to) {
-        return expenseRepository.sumByCategoryBetween(from, to).stream()
-                .map(row -> {
-                    Category cat = (Category) row[0];
-                    return new CategoryExpenseSummaryResponse(
-                            cat.getId(), cat.getCode(), cat.getName(),
-                            ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP));
-                })
+        return expenseRepository.sumAmountByCategoryCodeBetween(farmContext.getCurrentFarmId(), from, to).stream()
+                .map(row -> new CategoryExpenseSummaryResponse(
+                        (String) row[0],
+                        ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP)))
                 .collect(Collectors.toList());
     }
 
-    // ============ Helpers ============
-
-    private Category loadCategory(Long categoryId) {
+    private Category loadCategory(Long categoryId, Long farmId) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+        if (!category.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Category not found with id: " + categoryId);
+        }
         if (!category.isActive()) {
             throw new BusinessException("Category '" + category.getName() + "' is inactive");
         }
@@ -154,8 +152,13 @@ public class ExpenseService {
     }
 
     private Expense findOrThrow(Long id) {
-        return expenseRepository.findById(id)
+        Long farmId = farmContext.getCurrentFarmId();
+        Expense expense = expenseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found with id: " + id));
+        if (!expense.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Expense not found with id: " + id);
+        }
+        return expense;
     }
 
     private ExpenseResponse toResponse(Expense e) {

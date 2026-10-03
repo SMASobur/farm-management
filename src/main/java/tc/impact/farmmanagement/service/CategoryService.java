@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tc.impact.farmmanagement.dto.request.CategoryRequest;
 import tc.impact.farmmanagement.dto.response.CategoryResponse;
 import tc.impact.farmmanagement.entity.Category;
+import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.CategoryRepository;
@@ -22,41 +23,41 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final ExpenseRepository expenseRepository;
     private final SaleRepository saleRepository;
-
-    // ============ Create ============
+    private final FarmContext farmContext;
 
     @Transactional
     public CategoryResponse create(CategoryRequest request) {
+        Farm farm = farmContext.getCurrentFarm();
         String code = normalizeCode(request.getCode());
 
-        if (categoryRepository.existsByCodeAndType(code, request.getType())) {
+        if (categoryRepository.existsByFarmIdAndCodeAndType(farm.getId(), code, request.getType())) {
             throw new BusinessException(
                     "Category with code '" + code + "' already exists for type " + request.getType());
         }
 
         Category category = new Category();
+        category.setFarm(farm);
         category.setCode(code);
         category.setName(request.getName());
         category.setNameBn(request.getNameBn());
         category.setType(request.getType());
         category.setActive(request.getActive() != null ? request.getActive() : true);
-        category.setSystemDefault(false); // user-created categories are never system default
+        category.setSystemDefault(false);
         category.setDisplayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 100);
 
         return toResponse(categoryRepository.save(category));
     }
 
-    // ============ Read ============
-
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAll(Category.CategoryType type, boolean activeOnly) {
+        Long farmId = farmContext.getCurrentFarmId();
         List<Category> categories;
         if (type != null && activeOnly) {
-            categories = categoryRepository.findByTypeAndActiveTrueOrderByDisplayOrderAscNameAsc(type);
+            categories = categoryRepository.findByFarmIdAndTypeAndActiveTrueOrderByDisplayOrderAscNameAsc(farmId, type);
         } else if (type != null) {
-            categories = categoryRepository.findByTypeOrderByDisplayOrderAscNameAsc(type);
+            categories = categoryRepository.findByFarmIdAndTypeOrderByDisplayOrderAscNameAsc(farmId, type);
         } else {
-            categories = categoryRepository.findAll();
+            categories = categoryRepository.findByFarmId(farmId);
         }
         return categories.stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -66,24 +67,21 @@ public class CategoryService {
         return toResponse(findOrThrow(id));
     }
 
-    // ============ Update ============
-
     @Transactional
     public CategoryResponse update(Long id, CategoryRequest request) {
+        Long farmId = farmContext.getCurrentFarmId();
         Category category = findOrThrow(id);
         String code = normalizeCode(request.getCode());
 
-        // If code or type is changing, check uniqueness
         boolean codeChanged = !category.getCode().equals(code);
         boolean typeChanged = !category.getType().equals(request.getType());
 
         if ((codeChanged || typeChanged)
-                && categoryRepository.existsByCodeAndType(code, request.getType())) {
+                && categoryRepository.existsByFarmIdAndCodeAndType(farmId, code, request.getType())) {
             throw new BusinessException(
                     "Category with code '" + code + "' already exists for type " + request.getType());
         }
 
-        // Prevent type change on system categories (they have existing records)
         if (category.isSystemDefault() && typeChanged) {
             throw new BusinessException("Cannot change the type of a system category");
         }
@@ -102,8 +100,6 @@ public class CategoryService {
         return toResponse(categoryRepository.save(category));
     }
 
-    // ============ Delete ============
-
     @Transactional
     public void delete(Long id) {
         Category category = findOrThrow(id);
@@ -114,7 +110,6 @@ public class CategoryService {
                             "'. Deactivate it instead (set active=false).");
         }
 
-        // Check if any records reference this category
         long expenseCount = expenseRepository.countByCategoryId(id);
         long saleCount = saleRepository.countByCategoryId(id);
 
@@ -128,11 +123,14 @@ public class CategoryService {
         categoryRepository.deleteById(id);
     }
 
-    // ============ Helpers ============
-
     private Category findOrThrow(Long id) {
-        return categoryRepository.findById(id)
+        Long farmId = farmContext.getCurrentFarmId();
+        Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        if (!category.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Category not found with id: " + id);
+        }
+        return category;
     }
 
     private String normalizeCode(String code) {

@@ -10,16 +10,20 @@ import java.time.LocalDate;
 @Entity
 @Table(
         name = "milk_productions",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"animal_id", "date"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"farm_id", "animal_id", "date"})
 )
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class MilkProduction implements Production {
+public class MilkProduction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "farm_id", nullable = false)
+    private Farm farm;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "animal_id", nullable = false)
@@ -47,17 +51,5 @@ public class MilkProduction implements Production {
         double noon    = noonLiters    != null ? noonLiters    : 0.0;
         double night   = nightLiters   != null ? nightLiters   : 0.0;
         this.totalLiters = morning + noon + night;
-    }
-
-    // ---------- Production interface ----------
-
-    @Override
-    public Double getQuantity() {
-        return totalLiters;
-    }
-
-    @Override
-    public String getUnit() {
-        return "liter";
     }
 }

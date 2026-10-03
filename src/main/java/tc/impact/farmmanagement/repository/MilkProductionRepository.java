@@ -13,52 +13,27 @@ import java.util.Optional;
 @Repository
 public interface MilkProductionRepository extends JpaRepository<MilkProduction, Long> {
 
-    // ============ Basic lookups ============
+    List<MilkProduction> findByFarmId(Long farmId);
 
-    List<MilkProduction> findByAnimalId(Long animalId);
+    List<MilkProduction> findByFarmIdAndAnimalId(Long farmId, Long animalId);
 
-    List<MilkProduction> findByDate(LocalDate date);
+    List<MilkProduction> findByFarmIdAndDate(Long farmId, LocalDate date);
 
-    Optional<MilkProduction> findByAnimalIdAndDate(Long animalId, LocalDate date);
+    List<MilkProduction> findByFarmIdAndDateBetweenOrderByDateAsc(Long farmId, LocalDate from, LocalDate to);
 
-    boolean existsByAnimalIdAndDate(Long animalId, LocalDate date);
+    Optional<MilkProduction> findByFarmIdAndAnimalIdAndDate(Long farmId, Long animalId, LocalDate date);
 
-    // ============ Date range queries ============
+    boolean existsByFarmIdAndAnimalIdAndDate(Long farmId, Long animalId, LocalDate date);
 
-    List<MilkProduction> findByDateBetweenOrderByDateAsc(LocalDate from, LocalDate to);
+    @Query("SELECT COALESCE(SUM(m.totalLiters), 0.0) FROM MilkProduction m WHERE m.farm.id = :farmId AND m.date = :date")
+    Double sumLitersByFarmAndDate(@Param("farmId") Long farmId, @Param("date") LocalDate date);
 
-    List<MilkProduction> findByAnimalIdAndDateBetweenOrderByDateAsc(
-            Long animalId, LocalDate from, LocalDate to);
-
-    // ============ Aggregations ============
-
-    /**
-     * Total milk produced on a given day (across all animals).
-     */
-    @Query("SELECT COALESCE(SUM(m.totalLiters), 0.0) FROM MilkProduction m WHERE m.date = :date")
-    Double sumLitersByDate(@Param("date") LocalDate date);
-
-    /**
-     * Total milk for a specific animal on a specific day.
-     */
     @Query("SELECT COALESCE(SUM(m.totalLiters), 0.0) FROM MilkProduction m " +
-            "WHERE m.animal.id = :animalId AND m.date = :date")
-    Double sumLitersByAnimalAndDate(@Param("animalId") Long animalId,
-                                    @Param("date") LocalDate date);
+            "WHERE m.farm.id = :farmId AND m.date BETWEEN :from AND :to")
+    Double sumLitersByFarmBetween(@Param("farmId") Long farmId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    /**
-     * Total milk for a date range (used in monthly reports).
-     */
-    @Query("SELECT COALESCE(SUM(m.totalLiters), 0.0) FROM MilkProduction m " +
-            "WHERE m.date BETWEEN :from AND :to")
-    Double sumLitersBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
-
-    /**
-     * Daily totals for a date range, grouped by date.
-     * Returns: [LocalDate date, Double totalLiters]
-     */
     @Query("SELECT m.date, SUM(m.totalLiters) FROM MilkProduction m " +
-            "WHERE m.date BETWEEN :from AND :to " +
+            "WHERE m.farm.id = :farmId AND m.date BETWEEN :from AND :to " +
             "GROUP BY m.date ORDER BY m.date ASC")
-    List<Object[]> dailyTotalsBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+    List<Object[]> dailyTotalsBetween(@Param("farmId") Long farmId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

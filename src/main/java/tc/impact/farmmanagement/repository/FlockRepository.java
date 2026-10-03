@@ -10,11 +10,13 @@ import java.util.Optional;
 @Repository
 public interface FlockRepository extends JpaRepository<Flock, Long> {
 
-    Optional<Flock> findByFlockCode(String flockCode);
+    List<Flock> findByFarmId(Long farmId);
 
-    boolean existsByFlockCode(String flockCode);
+    Optional<Flock> findByFarmIdAndFlockCode(Long farmId, String flockCode);
 
-    List<Flock> findBySpecies(Flock.Species species);
+    boolean existsByFarmIdAndFlockCode(Long farmId, String flockCode);
 
-    List<Flock> findByStatus(Flock.FlockStatus status);
+    List<Flock> findByFarmIdAndSpecies(Long farmId, Flock.Species species);
+
+    List<Flock> findByFarmIdAndStatus(Long farmId, Flock.FlockStatus status);
 }

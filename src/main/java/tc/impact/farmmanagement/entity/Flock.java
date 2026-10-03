@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "flocks")
+@Table(
+        name = "flocks",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"farm_id", "flock_code"})
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,17 +21,21 @@ public class Flock {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "flock_code", unique = true, nullable = false)
-    private String flockCode;   // e.g., "Laying-A"
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "farm_id", nullable = false)
+    private Farm farm;
 
-    private String name;        // e.g., "Laying Hens Batch A"
+    @Column(name = "flock_code", nullable = false)
+    private String flockCode;
+
+    private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Species species;    // CHICKEN, DUCK, etc.
 
     @Column(name = "bird_count", nullable = false)
-    private Integer birdCount;  // e.g., 40
+    private Integer birdCount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -48,7 +55,6 @@ public class Flock {
         }
     }
 
-    // Reuse the same Species enum from Animal
     public enum Species {
         CHICKEN, DUCK, GOOSE, QUAIL, TURKEY, OTHER
     }

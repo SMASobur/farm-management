@@ -10,11 +10,13 @@ import java.util.Optional;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    List<Category> findByTypeOrderByDisplayOrderAscNameAsc(Category.CategoryType type);
+    List<Category> findByFarmIdAndTypeOrderByDisplayOrderAscNameAsc(Long farmId, Category.CategoryType type);
 
-    List<Category> findByTypeAndActiveTrueOrderByDisplayOrderAscNameAsc(Category.CategoryType type);
+    List<Category> findByFarmIdAndTypeAndActiveTrueOrderByDisplayOrderAscNameAsc(Long farmId, Category.CategoryType type);
 
-    Optional<Category> findByCodeAndType(String code, Category.CategoryType type);
+    Optional<Category> findByFarmIdAndCodeAndType(Long farmId, String code, Category.CategoryType type);
 
-    boolean existsByCodeAndType(String code, Category.CategoryType type);
+    boolean existsByFarmIdAndCodeAndType(Long farmId, String code, Category.CategoryType type);
+
+    List<Category> findByFarmId(Long farmId);
 }

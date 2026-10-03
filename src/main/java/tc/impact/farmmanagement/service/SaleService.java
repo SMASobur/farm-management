@@ -9,6 +9,7 @@ import tc.impact.farmmanagement.dto.response.ProductRevenueResponse;
 import tc.impact.farmmanagement.dto.response.SaleResponse;
 import tc.impact.farmmanagement.entity.Category;
 import tc.impact.farmmanagement.entity.Customer;
+import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.entity.Payment;
 import tc.impact.farmmanagement.entity.Sale;
 import tc.impact.farmmanagement.exception.BusinessException;
@@ -32,18 +33,22 @@ public class SaleService {
     private final CustomerRepository customerRepository;
     private final CategoryRepository categoryRepository;
     private final PaymentRepository paymentRepository;
-
-    // ============ Create ============
+    private final FarmContext farmContext;
 
     @Transactional
     public SaleResponse create(SaleRequest request) {
-        Customer customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Customer not found with id: " + request.getCustomerId()));
+        Farm farm = farmContext.getCurrentFarm();
 
-        Category category = loadCategory(request.getCategoryId());
+        Customer customer = customerRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + request.getCustomerId()));
+        if (!customer.getFarm().getId().equals(farm.getId())) {
+            throw new ResourceNotFoundException("Customer not found with id: " + request.getCustomerId());
+        }
+
+        Category category = loadProductCategory(request.getCategoryId(), farm.getId());
 
         Sale sale = new Sale();
+        sale.setFarm(farm);
         sale.setCustomer(customer);
         sale.setDate(request.getDate());
         sale.setCategory(category);
@@ -52,16 +57,14 @@ public class SaleService {
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
 
-        BigDecimal total = request.getQuantity()
-                .multiply(request.getUnitPrice())
+        BigDecimal total = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
         sale.setTotalAmount(total);
 
         BigDecimal initialPayment = request.getInitialPayment();
         if (initialPayment != null && initialPayment.signum() > 0) {
             if (initialPayment.compareTo(total) > 0) {
-                throw new BusinessException(
-                        "Initial payment (" + initialPayment + ") cannot exceed total amount (" + total + ")");
+                throw new BusinessException("Initial payment cannot exceed total amount");
             }
             sale.setPaidAmount(initialPayment);
         } else {
@@ -73,12 +76,12 @@ public class SaleService {
 
         if (initialPayment != null && initialPayment.signum() > 0) {
             Payment payment = new Payment();
+            payment.setFarm(farm);
             payment.setSale(saved);
             payment.setAmount(initialPayment);
             payment.setDate(request.getDate());
             payment.setMethod(request.getInitialPaymentMethod() != null
-                    ? request.getInitialPaymentMethod()
-                    : Payment.PaymentMethod.CASH);
+                    ? request.getInitialPaymentMethod() : Payment.PaymentMethod.CASH);
             payment.setNotes("Initial payment at sale creation");
             paymentRepository.save(payment);
         }
@@ -86,11 +89,10 @@ public class SaleService {
         return toResponse(saved);
     }
 
-    // ============ Read ============
-
     @Transactional(readOnly = true)
     public List<SaleResponse> getAll() {
-        return saleRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return saleRepository.findByFarmId(farmId).stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -100,67 +102,61 @@ public class SaleService {
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getByCustomer(Long customerId) {
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException("Customer not found with id: " + customerId);
-        }
-        return saleRepository.findByCustomerId(customerId).stream()
+        Long farmId = farmContext.getCurrentFarmId();
+        return saleRepository.findByFarmIdAndCustomerId(farmId, customerId).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getByDate(LocalDate date) {
-        return saleRepository.findByDate(date).stream().map(this::toResponse).collect(Collectors.toList());
+        Long farmId = farmContext.getCurrentFarmId();
+        return saleRepository.findByFarmIdAndDate(farmId, date).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getByRange(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
-        return saleRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
+        Long farmId = farmContext.getCurrentFarmId();
+        return saleRepository.findByFarmIdAndDateBetweenOrderByDateAsc(farmId, from, to).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getByCategory(Long categoryId) {
-        return saleRepository.findByCategoryId(categoryId).stream()
+        Long farmId = farmContext.getCurrentFarmId();
+        return saleRepository.findByFarmIdAndCategoryId(farmId, categoryId).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ============ Dues ============
-
     @Transactional(readOnly = true)
     public List<SaleResponse> getAllWithDues() {
-        return saleRepository.findAllWithDues().stream().map(this::toResponse).collect(Collectors.toList());
+        return saleRepository.findDuesByFarm(farmContext.getCurrentFarmId()).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getDuesByCustomer(Long customerId) {
-        if (!customerRepository.existsById(customerId)) {
-            throw new ResourceNotFoundException("Customer not found with id: " + customerId);
-        }
-        return saleRepository.findDuesByCustomer(customerId).stream()
+        Long farmId = farmContext.getCurrentFarmId();
+        return saleRepository.findDuesByFarmAndCustomer(farmId, customerId).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
-
-    // ============ Update ============
 
     @Transactional
     public SaleResponse update(Long id, SaleRequest request) {
         Sale sale = findOrThrow(id);
+        Long farmId = farmContext.getCurrentFarmId();
 
         if (!sale.getCustomer().getId().equals(request.getCustomerId())) {
-            throw new BusinessException(
-                    "Customer cannot be changed on an existing sale. Delete and recreate if needed.");
+            throw new BusinessException("Customer cannot be changed on an existing sale.");
         }
 
-        Category category = loadCategory(request.getCategoryId());
+        Category category = loadProductCategory(request.getCategoryId(), farmId);
 
-        BigDecimal newTotal = request.getQuantity()
-                .multiply(request.getUnitPrice())
+        BigDecimal newTotal = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
-
         if (newTotal.compareTo(sale.getPaidAmount()) < 0) {
-            throw new BusinessException(
-                    "Cannot reduce total amount below already-paid amount (" + sale.getPaidAmount() + ").");
+            throw new BusinessException("Cannot reduce total below already-paid amount");
         }
 
         sale.setDate(request.getDate());
@@ -174,37 +170,32 @@ public class SaleService {
         return toResponse(saleRepository.save(sale));
     }
 
-    // ============ Delete ============
-
     @Transactional
     public void delete(Long id) {
         Sale sale = findOrThrow(id);
         if (sale.getPaidAmount().signum() > 0) {
-            throw new BusinessException(
-                    "Cannot delete a sale that has payments recorded. Delete the payments first.");
+            throw new BusinessException("Cannot delete a sale with payments. Delete payments first.");
         }
-        List<Payment> payments = paymentRepository.findBySaleId(id);
+        List<Payment> payments = paymentRepository.findByFarmIdAndSaleId(farmContext.getCurrentFarmId(), id);
         if (!payments.isEmpty()) {
             paymentRepository.deleteAll(payments);
         }
         saleRepository.deleteById(id);
     }
 
-    // ============ Summaries ============
-
     @Transactional(readOnly = true)
     public BigDecimal getDailyRevenue(LocalDate date) {
-        return saleRepository.sumRevenueByDate(date);
+        return saleRepository.sumRevenueByFarmAndDate(farmContext.getCurrentFarmId(), date);
     }
 
     @Transactional(readOnly = true)
     public BigDecimal getRevenueBetween(LocalDate from, LocalDate to) {
-        return saleRepository.sumRevenueBetween(from, to);
+        return saleRepository.sumRevenueByFarmBetween(farmContext.getCurrentFarmId(), from, to);
     }
 
     @Transactional(readOnly = true)
     public List<DailyRevenueSummaryResponse> getDailyRevenueRange(LocalDate from, LocalDate to) {
-        return saleRepository.dailyRevenueBetween(from, to).stream()
+        return saleRepository.dailyRevenueBetween(farmContext.getCurrentFarmId(), from, to).stream()
                 .map(row -> new DailyRevenueSummaryResponse(
                         (LocalDate) row[0],
                         ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP)))
@@ -213,39 +204,43 @@ public class SaleService {
 
     @Transactional(readOnly = true)
     public List<ProductRevenueResponse> getRevenueByCategory(LocalDate from, LocalDate to) {
-        return saleRepository.sumRevenueByCategoryBetween(from, to).stream()
-                .map(row -> {
-                    Category c = (Category) row[0];
-                    return new ProductRevenueResponse(
-                            c.getId(), c.getCode(), c.getName(),
-                            ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP));
-                })
+        return saleRepository.sumRevenueByCategoryBetween(farmContext.getCurrentFarmId(), from, to).stream()
+                .map(row -> new ProductRevenueResponse(
+                        ((Number) row[0]).longValue(),
+                        (String) row[1],
+                        (String) row[2],
+                        ((BigDecimal) row[3]).setScale(2, RoundingMode.HALF_UP)))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public BigDecimal getAllDues() {
-        return saleRepository.sumAllDues();
+        return saleRepository.sumAllDuesByFarm(farmContext.getCurrentFarmId());
     }
 
-    // ============ Helpers ============
-
-    private Category loadCategory(Long categoryId) {
+    private Category loadProductCategory(Long categoryId, Long farmId) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+        if (!category.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Category not found with id: " + categoryId);
+        }
         if (!category.isActive()) {
             throw new BusinessException("Category '" + category.getName() + "' is inactive");
         }
         if (category.getType() != Category.CategoryType.PRODUCT) {
-            throw new BusinessException(
-                    "Category '" + category.getName() + "' is not a product category (type=" + category.getType() + ")");
+            throw new BusinessException("Category '" + category.getName() + "' is not a product category");
         }
         return category;
     }
 
     private Sale findOrThrow(Long id) {
-        return saleRepository.findById(id)
+        Long farmId = farmContext.getCurrentFarmId();
+        Sale sale = saleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale not found with id: " + id));
+        if (!sale.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Sale not found with id: " + id);
+        }
+        return sale;
     }
 
     SaleResponse toResponse(Sale sale) {

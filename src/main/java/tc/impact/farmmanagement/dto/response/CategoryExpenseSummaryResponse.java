@@ -10,8 +10,6 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CategoryExpenseSummaryResponse {
-    private Long categoryId;
     private String categoryCode;
-    private String categoryName;
     private BigDecimal total;
 }

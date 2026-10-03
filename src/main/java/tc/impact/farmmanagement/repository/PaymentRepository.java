@@ -13,40 +13,28 @@ import java.util.List;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
-    List<Payment> findBySaleId(Long saleId);
+    List<Payment> findByFarmId(Long farmId);
 
-    List<Payment> findByDate(LocalDate date);
+    List<Payment> findByFarmIdAndSaleId(Long farmId, Long saleId);
 
-    List<Payment> findByDateBetweenOrderByDateAsc(LocalDate from, LocalDate to);
+    List<Payment> findByFarmIdAndSaleIdOrderByDateAsc(Long farmId, Long saleId);
 
-    List<Payment> findBySaleIdOrderByDateAsc(Long saleId);
+    List<Payment> findByFarmIdAndDate(Long farmId, LocalDate date);
 
-    // ============ Aggregations ============
+    List<Payment> findByFarmIdAndDateBetweenOrderByDateAsc(Long farmId, LocalDate from, LocalDate to);
 
-    /**
-     * Sum of all payments for a sale. Used to recompute Sale.paidAmount.
-     */
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.sale.id = :saleId")
     BigDecimal sumAmountBySale(@Param("saleId") Long saleId);
 
-    /**
-     * Total cash received on a specific date.
-     */
-    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.date = :date")
-    BigDecimal sumAmountByDate(@Param("date") LocalDate date);
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.farm.id = :farmId AND p.date = :date")
+    BigDecimal sumAmountByFarmAndDate(@Param("farmId") Long farmId, @Param("date") LocalDate date);
 
-    /**
-     * Total cash received in a date range (true cash flow).
-     */
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p " +
-            "WHERE p.date BETWEEN :from AND :to")
-    BigDecimal sumAmountBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+            "WHERE p.farm.id = :farmId AND p.date BETWEEN :from AND :to")
+    BigDecimal sumAmountByFarmBetween(@Param("farmId") Long farmId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    /**
-     * Cash received by payment method in a date range (bkash vs cash analysis).
-     */
     @Query("SELECT p.method, SUM(p.amount) FROM Payment p " +
-            "WHERE p.date BETWEEN :from AND :to " +
+            "WHERE p.farm.id = :farmId AND p.date BETWEEN :from AND :to " +
             "GROUP BY p.method")
-    List<Object[]> sumAmountByMethodBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+    List<Object[]> sumAmountByMethodBetween(@Param("farmId") Long farmId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

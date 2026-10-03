@@ -10,13 +10,15 @@ import java.util.Optional;
 @Repository
 public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
-    Optional<Animal> findByTagNumber(String tagNumber);
+    List<Animal> findByFarmId(Long farmId);
 
-    boolean existsByTagNumber(String tagNumber);
+    Optional<Animal> findByFarmIdAndTagNumber(Long farmId, String tagNumber);
 
-    List<Animal> findBySpecies(Animal.Species species);
+    boolean existsByFarmIdAndTagNumber(Long farmId, String tagNumber);
 
-    List<Animal> findByStatus(Animal.AnimalStatus status);
+    List<Animal> findByFarmIdAndSpecies(Long farmId, Animal.Species species);
 
-    List<Animal> findBySpeciesAndStatus(Animal.Species species, Animal.AnimalStatus status);
+    List<Animal> findByFarmIdAndStatus(Long farmId, Animal.AnimalStatus status);
+
+    List<Animal> findByFarmIdAndSpeciesAndStatus(Long farmId, Animal.Species species, Animal.AnimalStatus status);
 }

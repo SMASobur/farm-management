@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "animals")
+@Table(
+        name = "animals",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"farm_id", "tag_number"})
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,10 +21,14 @@ public class Animal {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "tag_number", unique = true, nullable = false)
-    private String tagNumber;  // e.g., "Cow-01", "Goat-03", "Chicken-12"
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "farm_id", nullable = false)
+    private Farm farm;
 
-    private String name;       // Optional nickname, e.g., "Lakshmi"
+    @Column(name = "tag_number", nullable = false)
+    private String tagNumber;
+
+    private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
