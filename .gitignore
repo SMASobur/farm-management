@@ -44,4 +44,5 @@ target/
 
 # Secrets - DO NOT COMMIT
 .env
+.env.*
 application-local.properties

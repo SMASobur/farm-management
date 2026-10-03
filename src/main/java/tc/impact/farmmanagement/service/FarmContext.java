@@ -1,12 +1,12 @@
 package tc.impact.farmmanagement.service;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
-import tc.impact.farmmanagement.repository.FarmRepository;
+import tc.impact.farmmanagement.security.CustomUserPrincipal;
 
-import java.util.Optional;
 
 /**
  * Provides the "current farm" for the request.
@@ -15,10 +15,7 @@ import java.util.Optional;
  * Once JWT auth is in place, this will read the farm from the SecurityContext.
  */
 @Service
-@RequiredArgsConstructor
 public class FarmContext {
-
-    private final FarmRepository farmRepository;
 
     /**
      * Returns the current farm.
@@ -26,18 +23,19 @@ public class FarmContext {
      * Post-JWT: will read from SecurityContext.
      */
     public Farm getCurrentFarm() {
-        return getCurrentFarmOptional()
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No farm found. Please create a farm or check FarmSeeder."));
-    }
-
-    public Optional<Farm> getCurrentFarmOptional() {
-        return farmRepository.findAll().stream()
-                .filter(Farm::isActive)
-                .findFirst();
+        CustomUserPrincipal principal = getPrincipal();
+        return principal.getUser().getFarm();
     }
 
     public Long getCurrentFarmId() {
-        return getCurrentFarm().getId();
+        return getPrincipal().getFarmId();
+    }
+
+    private CustomUserPrincipal getPrincipal() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof CustomUserPrincipal)) {
+            throw new ResourceNotFoundException("No authenticated user");
+        }
+        return (CustomUserPrincipal) auth.getPrincipal();
     }
 }
