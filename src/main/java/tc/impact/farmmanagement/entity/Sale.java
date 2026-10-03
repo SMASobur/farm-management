@@ -26,9 +26,9 @@ public class Sale {
     @Column(nullable = false)
     private LocalDate date;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "product_type", nullable = false)
-    private ProductType productType;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -43,10 +43,6 @@ public class Sale {
     @Column(name = "total_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal totalAmount;
 
-    /**
-     * Derived from payments. Cached for query performance.
-     * Recomputed by the service whenever a payment is added/removed.
-     */
     @Column(name = "paid_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
@@ -73,32 +69,19 @@ public class Sale {
         if (quantity == null || unitPrice == null) {
             this.totalAmount = BigDecimal.ZERO;
         } else {
-            this.totalAmount = quantity.multiply(unitPrice).setScale(2, java.math.RoundingMode.HALF_UP);
+            this.totalAmount = quantity.multiply(unitPrice)
+                    .setScale(2, java.math.RoundingMode.HALF_UP);
         }
         if (paidAmount == null) {
             this.paidAmount = BigDecimal.ZERO;
         }
         this.dueAmount = this.totalAmount.subtract(this.paidAmount);
         if (this.dueAmount.signum() < 0) {
-            this.dueAmount = BigDecimal.ZERO; // overpayment handled separately
+            this.dueAmount = BigDecimal.ZERO;
         }
     }
 
-    // ---------- Enums ----------
-
-    public enum ProductType {
-        MILK,     // দুধ
-        EGG,      // ডিম
-        ANIMAL,   // পশু
-        MANURE,   // গোবর
-        FEED,     // খাদ্য (surplus sales)
-        OTHER
-    }
-
     public enum Unit {
-        LITER,    // লিটার
-        PIECE,    // পিস
-        KG,       // কেজি
-        HEAD      // পশুর সংখ্যা
+        LITER, PIECE, KG, HEAD
     }
 }

@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tc.impact.farmmanagement.dto.request.SaleRequest;
 import tc.impact.farmmanagement.dto.response.*;
-import tc.impact.farmmanagement.entity.Sale;
 import tc.impact.farmmanagement.service.SaleService;
 
 import java.math.BigDecimal;
@@ -36,13 +35,13 @@ public class SaleController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) Sale.ProductType productType) {
+            @RequestParam(required = false) Long categoryId) {
 
         if (from != null && to != null) {
             return ResponseEntity.ok(ApiResponse.success(saleService.getByRange(from, to)));
         }
-        if (productType != null) {
-            return ResponseEntity.ok(ApiResponse.success(saleService.getByProductType(productType)));
+        if (categoryId != null) {
+            return ResponseEntity.ok(ApiResponse.success(saleService.getByCategory(categoryId)));
         }
         return ResponseEntity.ok(ApiResponse.success(saleService.getAll()));
     }
@@ -109,10 +108,10 @@ public class SaleController {
         return ResponseEntity.ok(ApiResponse.success(saleService.getDailyRevenueRange(from, to)));
     }
 
-    @GetMapping("/summary/by-product")
-    public ResponseEntity<ApiResponse<List<ProductRevenueResponse>>> getRevenueByProduct(
+    @GetMapping("/summary/by-category")
+    public ResponseEntity<ApiResponse<List<ProductRevenueResponse>>> getRevenueByCategory(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(ApiResponse.success(saleService.getRevenueByProduct(from, to)));
+        return ResponseEntity.ok(ApiResponse.success(saleService.getRevenueByCategory(from, to)));
     }
 }

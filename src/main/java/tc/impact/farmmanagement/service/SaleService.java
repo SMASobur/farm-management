@@ -7,11 +7,13 @@ import tc.impact.farmmanagement.dto.request.SaleRequest;
 import tc.impact.farmmanagement.dto.response.DailyRevenueSummaryResponse;
 import tc.impact.farmmanagement.dto.response.ProductRevenueResponse;
 import tc.impact.farmmanagement.dto.response.SaleResponse;
+import tc.impact.farmmanagement.entity.Category;
 import tc.impact.farmmanagement.entity.Customer;
 import tc.impact.farmmanagement.entity.Payment;
 import tc.impact.farmmanagement.entity.Sale;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
+import tc.impact.farmmanagement.repository.CategoryRepository;
 import tc.impact.farmmanagement.repository.CustomerRepository;
 import tc.impact.farmmanagement.repository.PaymentRepository;
 import tc.impact.farmmanagement.repository.SaleRepository;
@@ -28,6 +30,7 @@ public class SaleService {
 
     private final SaleRepository saleRepository;
     private final CustomerRepository customerRepository;
+    private final CategoryRepository categoryRepository;
     private final PaymentRepository paymentRepository;
 
     // ============ Create ============
@@ -38,23 +41,22 @@ public class SaleService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Customer not found with id: " + request.getCustomerId()));
 
+        Category category = loadCategory(request.getCategoryId());
+
         Sale sale = new Sale();
         sale.setCustomer(customer);
         sale.setDate(request.getDate());
-        sale.setProductType(request.getProductType());
+        sale.setCategory(category);
         sale.setUnit(request.getUnit());
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
 
-        // Total is calculated in the entity's @PrePersist
-        // But we need it now to validate initial payment
         BigDecimal total = request.getQuantity()
                 .multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
         sale.setTotalAmount(total);
 
-        // Validate + apply initial payment
         BigDecimal initialPayment = request.getInitialPayment();
         if (initialPayment != null && initialPayment.signum() > 0) {
             if (initialPayment.compareTo(total) > 0) {
@@ -65,12 +67,10 @@ public class SaleService {
         } else {
             sale.setPaidAmount(BigDecimal.ZERO);
         }
-
         sale.setDueAmount(total.subtract(sale.getPaidAmount()));
 
         Sale saved = saleRepository.save(sale);
 
-        // If there was an initial payment, persist a Payment row for audit trail
         if (initialPayment != null && initialPayment.signum() > 0) {
             Payment payment = new Payment();
             payment.setSale(saved);
@@ -90,9 +90,7 @@ public class SaleService {
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getAll() {
-        return saleRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return saleRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -100,46 +98,38 @@ public class SaleService {
         return toResponse(findOrThrow(id));
     }
 
+    @Transactional(readOnly = true)
     public List<SaleResponse> getByCustomer(Long customerId) {
         if (!customerRepository.existsById(customerId)) {
             throw new ResourceNotFoundException("Customer not found with id: " + customerId);
         }
         return saleRepository.findByCustomerId(customerId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getByDate(LocalDate date) {
-        return saleRepository.findByDate(date).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return saleRepository.findByDate(date).stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getByRange(LocalDate from, LocalDate to) {
-        if (from.isAfter(to)) {
-            throw new BusinessException("'from' date cannot be after 'to' date");
-        }
+        if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
         return saleRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<SaleResponse> getByProductType(Sale.ProductType productType) {
-        return saleRepository.findByProductType(productType).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+    public List<SaleResponse> getByCategory(Long categoryId) {
+        return saleRepository.findByCategoryId(categoryId).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     // ============ Dues ============
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getAllWithDues() {
-        return saleRepository.findAllWithDues().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return saleRepository.findAllWithDues().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -148,8 +138,7 @@ public class SaleService {
             throw new ResourceNotFoundException("Customer not found with id: " + customerId);
         }
         return saleRepository.findDuesByCustomer(customerId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     // ============ Update ============
@@ -158,34 +147,30 @@ public class SaleService {
     public SaleResponse update(Long id, SaleRequest request) {
         Sale sale = findOrThrow(id);
 
-        // Customer cannot be changed on update (keeps dues history clean)
         if (!sale.getCustomer().getId().equals(request.getCustomerId())) {
             throw new BusinessException(
                     "Customer cannot be changed on an existing sale. Delete and recreate if needed.");
         }
 
-        // Recalculate totals with new quantity/price
+        Category category = loadCategory(request.getCategoryId());
+
         BigDecimal newTotal = request.getQuantity()
                 .multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
 
-        // If new total is less than what's already been paid, block the update
         if (newTotal.compareTo(sale.getPaidAmount()) < 0) {
             throw new BusinessException(
-                    "Cannot reduce total amount below already-paid amount (" + sale.getPaidAmount() + "). " +
-                            "Current paid: " + sale.getPaidAmount() + ", new total would be: " + newTotal);
+                    "Cannot reduce total amount below already-paid amount (" + sale.getPaidAmount() + ").");
         }
 
         sale.setDate(request.getDate());
-        sale.setProductType(request.getProductType());
+        sale.setCategory(category);
         sale.setUnit(request.getUnit());
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
 
-        sale.calculateAmounts(); // recompute total & due from quantity/price
-        // @PreUpdate recalculates again on save, which is fine (idempotent)
-
+        sale.calculateAmounts();
         return toResponse(saleRepository.save(sale));
     }
 
@@ -194,32 +179,30 @@ public class SaleService {
     @Transactional
     public void delete(Long id) {
         Sale sale = findOrThrow(id);
-
         if (sale.getPaidAmount().signum() > 0) {
             throw new BusinessException(
-                    "Cannot delete a sale that has payments recorded. " +
-                            "Delete the payments first, then delete the sale.");
+                    "Cannot delete a sale that has payments recorded. Delete the payments first.");
         }
-
-        // Cascade: delete all payment rows for this sale (they should be 0 anyway)
         List<Payment> payments = paymentRepository.findBySaleId(id);
         if (!payments.isEmpty()) {
             paymentRepository.deleteAll(payments);
         }
-
         saleRepository.deleteById(id);
     }
 
     // ============ Summaries ============
 
+    @Transactional(readOnly = true)
     public BigDecimal getDailyRevenue(LocalDate date) {
         return saleRepository.sumRevenueByDate(date);
     }
 
+    @Transactional(readOnly = true)
     public BigDecimal getRevenueBetween(LocalDate from, LocalDate to) {
         return saleRepository.sumRevenueBetween(from, to);
     }
 
+    @Transactional(readOnly = true)
     public List<DailyRevenueSummaryResponse> getDailyRevenueRange(LocalDate from, LocalDate to) {
         return saleRepository.dailyRevenueBetween(from, to).stream()
                 .map(row -> new DailyRevenueSummaryResponse(
@@ -228,19 +211,37 @@ public class SaleService {
                 .collect(Collectors.toList());
     }
 
-    public List<ProductRevenueResponse> getRevenueByProduct(LocalDate from, LocalDate to) {
-        return saleRepository.sumRevenueByProductTypeBetween(from, to).stream()
-                .map(row -> new ProductRevenueResponse(
-                        (Sale.ProductType) row[0],
-                        ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP)))
+    @Transactional(readOnly = true)
+    public List<ProductRevenueResponse> getRevenueByCategory(LocalDate from, LocalDate to) {
+        return saleRepository.sumRevenueByCategoryBetween(from, to).stream()
+                .map(row -> {
+                    Category c = (Category) row[0];
+                    return new ProductRevenueResponse(
+                            c.getId(), c.getCode(), c.getName(),
+                            ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP));
+                })
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public BigDecimal getAllDues() {
         return saleRepository.sumAllDues();
     }
 
     // ============ Helpers ============
+
+    private Category loadCategory(Long categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+        if (!category.isActive()) {
+            throw new BusinessException("Category '" + category.getName() + "' is inactive");
+        }
+        if (category.getType() != Category.CategoryType.PRODUCT) {
+            throw new BusinessException(
+                    "Category '" + category.getName() + "' is not a product category (type=" + category.getType() + ")");
+        }
+        return category;
+    }
 
     private Sale findOrThrow(Long id) {
         return saleRepository.findById(id)
@@ -254,7 +255,10 @@ public class SaleService {
         response.setCustomerName(sale.getCustomer().getName());
         response.setCustomerPhone(sale.getCustomer().getPhone());
         response.setDate(sale.getDate());
-        response.setProductType(sale.getProductType());
+        response.setCategoryId(sale.getCategory().getId());
+        response.setCategoryCode(sale.getCategory().getCode());
+        response.setCategoryName(sale.getCategory().getName());
+        response.setCategoryNameBn(sale.getCategory().getNameBn());
         response.setUnit(sale.getUnit());
         response.setQuantity(sale.getQuantity());
         response.setUnitPrice(sale.getUnitPrice());

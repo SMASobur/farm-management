@@ -18,8 +18,8 @@ public class SaleRequest {
     @NotNull(message = "Date is required")
     private LocalDate date;
 
-    @NotNull(message = "Product type is required")
-    private Sale.ProductType productType;
+    @NotNull(message = "Category ID is required (e.g., milk, egg, animal)")
+    private Long categoryId;
 
     @NotNull(message = "Unit is required")
     private Sale.Unit unit;
@@ -34,9 +34,7 @@ public class SaleRequest {
 
     private String notes;
 
-    // Optional: initial payment recorded at sale time
     private BigDecimal initialPayment;
 
-    // Optional: payment method for the initial payment
     private Payment.PaymentMethod initialPaymentMethod;
 }

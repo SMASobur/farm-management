@@ -13,7 +13,10 @@ public class SaleResponse {
     private String customerName;
     private String customerPhone;
     private LocalDate date;
-    private Sale.ProductType productType;
+    private Long categoryId;
+    private String categoryCode;
+    private String categoryName;
+    private String categoryNameBn;
     private Sale.Unit unit;
     private BigDecimal quantity;
     private BigDecimal unitPrice;

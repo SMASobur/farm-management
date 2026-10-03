@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import tc.impact.farmmanagement.entity.Category;
 import tc.impact.farmmanagement.entity.Expense;
 
 import java.math.BigDecimal;
@@ -19,10 +20,11 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     List<Expense> findByDateBetweenOrderByDateAsc(LocalDate from, LocalDate to);
 
-    List<Expense> findByCategory(Expense.ExpenseCategory category);
+    List<Expense> findByCategoryId(Long categoryId);
 
-    List<Expense> findByCategoryAndDateBetweenOrderByDateAsc(
-            Expense.ExpenseCategory category, LocalDate from, LocalDate to);
+    List<Expense> findByCategoryIdAndDateBetweenOrderByDateAsc(Long categoryId, LocalDate from, LocalDate to);
+
+    long countByCategoryId(Long categoryId);
 
     // ============ Aggregations ============
 
@@ -34,16 +36,16 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     BigDecimal sumAmountBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /**
-     * Total expenses grouped by category in a date range (for reports).
-     * Returns: [ExpenseCategory category, BigDecimal total]
+     * Total expenses grouped by category in a date range.
+     * Returns: [Category, BigDecimal]
      */
     @Query("SELECT e.category, SUM(e.amount) FROM Expense e " +
             "WHERE e.date BETWEEN :from AND :to " +
-            "GROUP BY e.category ORDER BY e.category")
+            "GROUP BY e.category")
     List<Object[]> sumByCategoryBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /**
-     * Daily expense totals for a range — used for the dashboard chart.
+     * Daily expense totals for a range.
      */
     @Query("SELECT e.date, SUM(e.amount) FROM Expense e " +
             "WHERE e.date BETWEEN :from AND :to " +

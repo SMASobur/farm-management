@@ -11,7 +11,6 @@ import tc.impact.farmmanagement.dto.response.ApiResponse;
 import tc.impact.farmmanagement.dto.response.CategoryExpenseSummaryResponse;
 import tc.impact.farmmanagement.dto.response.DailyExpenseSummaryResponse;
 import tc.impact.farmmanagement.dto.response.ExpenseResponse;
-import tc.impact.farmmanagement.entity.Expense;
 import tc.impact.farmmanagement.service.ExpenseService;
 
 import java.math.BigDecimal;
@@ -25,8 +24,6 @@ public class ExpenseController {
 
     private final ExpenseService expenseService;
 
-    // ============ CRUD ============
-
     @PostMapping
     public ResponseEntity<ApiResponse<ExpenseResponse>> create(@Valid @RequestBody ExpenseRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -35,21 +32,21 @@ public class ExpenseController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<ExpenseResponse>>> getAll(
-            @RequestParam(required = false) Expense.ExpenseCategory category,
+            @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 
-        if (category != null && from != null && to != null) {
+        if (categoryId != null && from != null && to != null) {
             return ResponseEntity.ok(ApiResponse.success(
-                    expenseService.getByCategoryAndRange(category, from, to)));
+                    expenseService.getByCategoryAndRange(categoryId, from, to)));
         }
         if (from != null && to != null) {
             return ResponseEntity.ok(ApiResponse.success(expenseService.getByRange(from, to)));
         }
-        if (category != null) {
-            return ResponseEntity.ok(ApiResponse.success(expenseService.getByCategory(category)));
+        if (categoryId != null) {
+            return ResponseEntity.ok(ApiResponse.success(expenseService.getByCategory(categoryId)));
         }
         return ResponseEntity.ok(ApiResponse.success(expenseService.getAll()));
     }
@@ -71,15 +68,11 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success("Expense deleted", null));
     }
 
-    // ============ Filters ============
-
     @GetMapping("/date/{date}")
     public ResponseEntity<ApiResponse<List<ExpenseResponse>>> getByDate(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(expenseService.getByDate(date)));
     }
-
-    // ============ Summaries ============
 
     @GetMapping("/summary/daily")
     public ResponseEntity<ApiResponse<BigDecimal>> getDailyTotal(

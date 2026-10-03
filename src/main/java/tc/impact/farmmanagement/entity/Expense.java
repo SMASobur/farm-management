@@ -22,9 +22,9 @@ public class Expense {
     @Column(nullable = false)
     private LocalDate date;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ExpenseCategory category;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     @Column(nullable = false)
     private String description;
@@ -35,10 +35,9 @@ public class Expense {
     private String notes;
 
     /**
-     * Future: link to a Worker entity for salary tracking.
-     * Left null for now; will be populated when Worker module is added.
+     * Reserved for future Worker entity integration (salary tracking).
      */
-    // private Worker worker;  // uncomment when Worker is built
+    // private Worker worker;
 
     @Column(name = "created_at", updatable = false)
     private LocalDate createdAt;
@@ -49,18 +48,5 @@ public class Expense {
         if (this.date == null) {
             this.date = LocalDate.now();
         }
-    }
-
-    public enum ExpenseCategory {
-        FEED,          // খাদ্য
-        MEDICINE,      // ঔষধ
-        LABOR,         // শ্রমিক (salary, daily wage, etc.)
-        UTILITIES,     // ইউটিলিটি
-        EQUIPMENT,     // যন্ত্রপাতি
-        TRANSPORT,     // পরিবহন
-        RENT,          // ভাড়া
-        VET,           // পশু চিকিৎসা
-        MAINTENANCE,   // মেরামত
-        OTHER          // অন্যান্য
     }
 }

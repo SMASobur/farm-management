@@ -1,7 +1,7 @@
 package tc.impact.farmmanagement.dto.response;
 
 import lombok.Data;
-import tc.impact.farmmanagement.entity.Expense;
+import tc.impact.farmmanagement.entity.Category;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,7 +10,10 @@ import java.time.LocalDate;
 public class ExpenseResponse {
     private Long id;
     private LocalDate date;
-    private Expense.ExpenseCategory category;
+    private Long categoryId;
+    private String categoryCode;
+    private String categoryName;
+    private String categoryNameBn;
     private String description;
     private BigDecimal amount;
     private String notes;
