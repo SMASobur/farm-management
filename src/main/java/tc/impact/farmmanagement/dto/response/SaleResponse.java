@@ -17,7 +17,10 @@ public class SaleResponse {
     private String categoryCode;
     private String categoryName;
     private String categoryNameBn;
-    private Sale.Unit unit;
+    private Long unitId;
+    private String unitCode;
+    private String unitName;
+    private String unitAbbreviation;
     private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal totalAmount;

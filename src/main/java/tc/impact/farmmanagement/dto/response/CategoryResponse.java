@@ -16,4 +16,8 @@ public class CategoryResponse {
     private boolean systemDefault;
     private Integer displayOrder;
     private LocalDate createdAt;
+    private Long defaultUnitId;
+    private String defaultUnitCode;
+    private String defaultUnitName;
+    private java.math.BigDecimal defaultPrice;
 }

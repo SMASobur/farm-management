@@ -26,4 +26,8 @@ public class CategoryRequest {
     private Boolean active;
 
     private Integer displayOrder;
+
+    private Long defaultUnitId;
+
+    private java.math.BigDecimal defaultPrice;
 }

@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -28,15 +29,9 @@ public class Category {
     @Column(nullable = false, length = 50)
     private String code;
 
-    /**
-     * Display name in English (or primary language).
-     */
     @Column(nullable = false, length = 100)
     private String name;
 
-    /**
-     * Optional Bengali display name (or secondary language).
-     */
     @Column(name = "name_bn", length = 100)
     private String nameBn;
 
@@ -44,21 +39,32 @@ public class Category {
     @Column(nullable = false, length = 20)
     private CategoryType type;
 
-    /**
-     * When false, category is hidden from dropdowns but historical
-     * records still reference it correctly.
-     */
     @Column(nullable = false)
     private boolean active = true;
 
-    /**
-     * Prevents deletion of system-default categories (FEED, MILK, etc.).
-     * Users can deactivate but not delete these.
-     */
     @Column(name = "system_default", nullable = false)
     private boolean systemDefault = false;
 
     private Integer displayOrder = 100;
+
+    // ============ NEW: default unit + price ============
+
+    /**
+     * Default unit for this category. When a user picks this category
+     * in a sale form, this unit is pre-selected.
+     * Only meaningful for PRODUCT-type categories.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_unit_id")
+    private Unit defaultUnit;
+
+    /**
+     * Default price per unit. Used to pre-fill the unit price
+     * in sale forms. Nullable — user can always override.
+     * Only meaningful for PRODUCT-type categories.
+     */
+    @Column(name = "default_price", precision = 12, scale = 2)
+    private BigDecimal defaultPrice;
 
     @Column(name = "created_at", updatable = false)
     private LocalDate createdAt;
@@ -66,13 +72,10 @@ public class Category {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDate.now();
-        if (this.displayOrder == null) {
-            this.displayOrder = 100;
-        }
+        if (this.displayOrder == null) this.displayOrder = 100;
     }
 
     public enum CategoryType {
-        EXPENSE,   // for expenses
-        PRODUCT    // for sale products
+        EXPENSE, PRODUCT
     }
 }

@@ -22,7 +22,7 @@ public class SaleRequest {
     private Long categoryId;
 
     @NotNull(message = "Unit is required")
-    private Sale.Unit unit;
+    private Long unitId;
 
     @NotNull(message = "Quantity is required")
     @Positive(message = "Quantity must be positive")

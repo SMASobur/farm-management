@@ -34,8 +34,9 @@ public class Sale {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    // CHANGED: was enum, now FK to Unit entity
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "unit_id", nullable = false)
     private Unit unit;
 
     @Column(nullable = false, precision = 12, scale = 3)
@@ -76,16 +77,8 @@ public class Sale {
             this.totalAmount = quantity.multiply(unitPrice)
                     .setScale(2, java.math.RoundingMode.HALF_UP);
         }
-        if (paidAmount == null) {
-            this.paidAmount = BigDecimal.ZERO;
-        }
+        if (paidAmount == null) this.paidAmount = BigDecimal.ZERO;
         this.dueAmount = this.totalAmount.subtract(this.paidAmount);
-        if (this.dueAmount.signum() < 0) {
-            this.dueAmount = BigDecimal.ZERO;
-        }
-    }
-
-    public enum Unit {
-        LITER, PIECE, KG, HEAD
+        if (this.dueAmount.signum() < 0) this.dueAmount = BigDecimal.ZERO;
     }
 }

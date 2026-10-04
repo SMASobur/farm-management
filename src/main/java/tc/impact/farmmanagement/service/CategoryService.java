@@ -7,11 +7,13 @@ import tc.impact.farmmanagement.dto.request.CategoryRequest;
 import tc.impact.farmmanagement.dto.response.CategoryResponse;
 import tc.impact.farmmanagement.entity.Category;
 import tc.impact.farmmanagement.entity.Farm;
+import tc.impact.farmmanagement.entity.Unit;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.CategoryRepository;
 import tc.impact.farmmanagement.repository.ExpenseRepository;
 import tc.impact.farmmanagement.repository.SaleRepository;
+import tc.impact.farmmanagement.repository.UnitRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,6 +26,7 @@ public class CategoryService {
     private final ExpenseRepository expenseRepository;
     private final SaleRepository saleRepository;
     private final FarmContext farmContext;
+    private final UnitRepository unitRepository;
 
     @Transactional
     public CategoryResponse create(CategoryRequest request) {
@@ -35,6 +38,15 @@ public class CategoryService {
                     "Category with code '" + code + "' already exists for type " + request.getType());
         }
 
+        Unit defaultUnit = null;
+        if (request.getDefaultUnitId() != null) {
+            defaultUnit = unitRepository.findById(request.getDefaultUnitId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Unit not found"));
+            if (!defaultUnit.getFarm().getId().equals(farm.getId())) {
+                throw new ResourceNotFoundException("Unit not found");
+            }
+        }
+
         Category category = new Category();
         category.setFarm(farm);
         category.setCode(code);
@@ -44,6 +56,8 @@ public class CategoryService {
         category.setActive(request.getActive() != null ? request.getActive() : true);
         category.setSystemDefault(false);
         category.setDisplayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 100);
+        category.setDefaultUnit(defaultUnit);
+        category.setDefaultPrice(request.getDefaultPrice());
 
         return toResponse(categoryRepository.save(category));
     }
@@ -148,6 +162,12 @@ public class CategoryService {
         response.setSystemDefault(c.isSystemDefault());
         response.setDisplayOrder(c.getDisplayOrder());
         response.setCreatedAt(c.getCreatedAt());
+        if (c.getDefaultUnit() != null) {
+            response.setDefaultUnitId(c.getDefaultUnit().getId());
+            response.setDefaultUnitCode(c.getDefaultUnit().getCode());
+            response.setDefaultUnitName(c.getDefaultUnit().getName());
+        }
+        response.setDefaultPrice(c.getDefaultPrice());
         return response;
     }
 }

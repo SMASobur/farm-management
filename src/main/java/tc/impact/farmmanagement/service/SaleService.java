@@ -7,17 +7,10 @@ import tc.impact.farmmanagement.dto.request.SaleRequest;
 import tc.impact.farmmanagement.dto.response.DailyRevenueSummaryResponse;
 import tc.impact.farmmanagement.dto.response.ProductRevenueResponse;
 import tc.impact.farmmanagement.dto.response.SaleResponse;
-import tc.impact.farmmanagement.entity.Category;
-import tc.impact.farmmanagement.entity.Customer;
-import tc.impact.farmmanagement.entity.Farm;
-import tc.impact.farmmanagement.entity.Payment;
-import tc.impact.farmmanagement.entity.Sale;
+import tc.impact.farmmanagement.entity.*;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
-import tc.impact.farmmanagement.repository.CategoryRepository;
-import tc.impact.farmmanagement.repository.CustomerRepository;
-import tc.impact.farmmanagement.repository.PaymentRepository;
-import tc.impact.farmmanagement.repository.SaleRepository;
+import tc.impact.farmmanagement.repository.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -34,25 +27,26 @@ public class SaleService {
     private final CategoryRepository categoryRepository;
     private final PaymentRepository paymentRepository;
     private final FarmContext farmContext;
+    private final UnitRepository unitRepository;
 
     @Transactional
     public SaleResponse create(SaleRequest request) {
         Farm farm = farmContext.getCurrentFarm();
-
         Customer customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + request.getCustomerId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
         if (!customer.getFarm().getId().equals(farm.getId())) {
-            throw new ResourceNotFoundException("Customer not found with id: " + request.getCustomerId());
+            throw new ResourceNotFoundException("Customer not found");
         }
 
         Category category = loadProductCategory(request.getCategoryId(), farm.getId());
+        Unit unit = loadUnit(request.getUnitId(), farm.getId());
 
         Sale sale = new Sale();
         sale.setFarm(farm);
         sale.setCustomer(customer);
         sale.setDate(request.getDate());
         sale.setCategory(category);
-        sale.setUnit(request.getUnit());
+        sale.setUnit(unit);
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
@@ -87,6 +81,18 @@ public class SaleService {
         }
 
         return toResponse(saved);
+    }
+
+    private Unit loadUnit(Long unitId, Long farmId) {
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unit not found with id: " + unitId));
+        if (!unit.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Unit not found");
+        }
+        if (!unit.isActive()) {
+            throw new BusinessException("Unit '" + unit.getName() + "' is inactive");
+        }
+        return unit;
     }
 
     @Transactional(readOnly = true)
@@ -161,7 +167,7 @@ public class SaleService {
 
         sale.setDate(request.getDate());
         sale.setCategory(category);
-        sale.setUnit(request.getUnit());
+        sale.setUnit(loadUnit(request.getUnitId(), farmId));
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
@@ -254,7 +260,10 @@ public class SaleService {
         response.setCategoryCode(sale.getCategory().getCode());
         response.setCategoryName(sale.getCategory().getName());
         response.setCategoryNameBn(sale.getCategory().getNameBn());
-        response.setUnit(sale.getUnit());
+        response.setUnitId(sale.getUnit().getId());
+        response.setUnitCode(sale.getUnit().getCode());
+        response.setUnitName(sale.getUnit().getName());
+        response.setUnitAbbreviation(sale.getUnit().getAbbreviation());
         response.setQuantity(sale.getQuantity());
         response.setUnitPrice(sale.getUnitPrice());
         response.setTotalAmount(sale.getTotalAmount());
