@@ -24,6 +24,8 @@ import tc.impact.farmmanagement.security.CustomUserPrincipal;
 import tc.impact.farmmanagement.security.JwtService;
 import tc.impact.farmmanagement.dto.request.ChangePasswordRequest;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
+import tc.impact.farmmanagement.dto.request.AcceptInviteRequest;
+import tc.impact.farmmanagement.service.InviteService;
 
 import java.util.Locale;
 
@@ -132,6 +134,19 @@ public class AuthController {
 
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
     }
+
+    // ============ Accept Invite (public) ============
+
+    @PostMapping("/accept-invite")
+    @Transactional
+    public ResponseEntity<ApiResponse<AuthResponse>> acceptInvite(
+            @Valid @RequestBody AcceptInviteRequest request) {
+        AuthResponse response = inviteService.acceptInvite(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Joined farm successfully", response));
+    }
+
+    private final InviteService inviteService;
 
     // ============ Helpers ============
 
