@@ -23,4 +23,5 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     List<Customer> findByFarmIdAndNameContainingIgnoreCase(Long farmId, String namePart);
 
+    long countByFarmId(Long farmId);
 }

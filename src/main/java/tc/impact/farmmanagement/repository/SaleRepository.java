@@ -71,4 +71,8 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     BigDecimal sumDueByCustomerAndFarm(@Param("customerId") Long customerId,
                                        @Param("farmId") Long farmId);
 
+
+    @Query("SELECT COUNT(DISTINCT s.customer.id) FROM Sale s " +
+            "WHERE s.farm.id = :farmId AND s.dueAmount > 0")
+    long countCustomersWithDues(@Param("farmId") Long farmId);
 }

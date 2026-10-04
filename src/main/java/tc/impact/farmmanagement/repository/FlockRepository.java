@@ -19,4 +19,5 @@ public interface FlockRepository extends JpaRepository<Flock, Long> {
     List<Flock> findByFarmIdAndSpecies(Long farmId, Flock.Species species);
 
     List<Flock> findByFarmIdAndStatus(Long farmId, Flock.FlockStatus status);
-}
+
+    long countByFarmIdAndStatus(Long farmId, Flock.FlockStatus status);}
