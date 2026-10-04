@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.*;
 import tc.impact.farmmanagement.dto.response.ApiResponse;
 import tc.impact.farmmanagement.dto.response.MonthlyReportResponse;
 import tc.impact.farmmanagement.service.ReportService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import tc.impact.farmmanagement.service.ExportService;
 
 import java.time.LocalDate;
 
@@ -38,4 +41,34 @@ public class ReportController {
             @RequestParam int month) {
         return ResponseEntity.ok(ApiResponse.success(reportService.buildMonthlyReport(year, month)));
     }
+    @GetMapping("/export.xlsx")
+    public ResponseEntity<byte[]> exportExcel(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+
+        byte[] bytes = exportService.exportReportAsExcel(from, to);
+        String filename = "farm-report-" + from + "-to-" + to + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    @GetMapping("/export.pdf")
+    public ResponseEntity<byte[]> exportPdf(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+
+        byte[] bytes = exportService.exportReportAsPdf(from, to);
+        String filename = "farm-report-" + from + "-to-" + to + ".pdf";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(bytes);
+    }
+
+    private final ExportService exportService;
 }
