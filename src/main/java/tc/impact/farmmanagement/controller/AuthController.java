@@ -96,6 +96,15 @@ public class AuthController {
                 .body(ApiResponse.success("Registration successful", response));
     }
 
+    // ============ Me ============
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<AuthResponse.UserInfo>> me() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        CustomUserPrincipal principal = (CustomUserPrincipal) auth.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success(buildUserInfo(principal)));
+    }
+
     // ============ Change Password ============
 
     @PostMapping("/change-password")
@@ -122,15 +131,6 @@ public class AuthController {
         userRepository.save(user);
 
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
-    }
-
-    // ============ Me ============
-
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponse<AuthResponse.UserInfo>> me() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        CustomUserPrincipal principal = (CustomUserPrincipal) auth.getPrincipal();
-        return ResponseEntity.ok(ApiResponse.success(buildUserInfo(principal)));
     }
 
     // ============ Helpers ============
