@@ -22,6 +22,8 @@ import tc.impact.farmmanagement.repository.FarmRepository;
 import tc.impact.farmmanagement.repository.UserRepository;
 import tc.impact.farmmanagement.security.CustomUserPrincipal;
 import tc.impact.farmmanagement.security.JwtService;
+import tc.impact.farmmanagement.dto.request.ChangePasswordRequest;
+import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 
 import java.util.Locale;
 
@@ -92,6 +94,34 @@ public class AuthController {
         AuthResponse response = buildAuthResponse(principal, token);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Registration successful", response));
+    }
+
+    // ============ Change Password ============
+
+    @PostMapping("/change-password")
+    @Transactional
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        CustomUserPrincipal principal = (CustomUserPrincipal) auth.getPrincipal();
+        User user = userRepository.findById(principal.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Verify current password
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BusinessException("Current password is incorrect");
+        }
+
+        // Prevent reusing the same password
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new BusinessException("New password must be different from current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
     }
 
     // ============ Me ============
