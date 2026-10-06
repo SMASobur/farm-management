@@ -85,9 +85,10 @@ public class Animal {
     // ---------- Helper: Is this animal a milk producer? ----------
 
     public boolean isMilkProducer() {
-        return this.species == Species.COW
+        boolean isMilkSpecies = this.species == Species.COW
                 || this.species == Species.GOAT
                 || this.species == Species.SHEEP
                 || this.species == Species.BUFFALO;
+        return isMilkSpecies && this.gender == Gender.FEMALE;
     }
 }
