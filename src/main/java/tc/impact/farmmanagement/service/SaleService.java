@@ -136,6 +136,36 @@ public class SaleService {
     }
 
     @Transactional(readOnly = true)
+    public List<SaleResponse> getFiltered(
+            LocalDate from, LocalDate to, Long customerId, Long categoryId) {
+        Long farmId = farmContext.getCurrentFarmId();
+        List<Sale> sales;
+
+        // Handle the common combinations efficiently at the DB level
+        if (customerId != null && from != null && to != null) {
+            sales = saleRepository.findByFarmIdAndCustomerIdAndDateBetweenOrderByDateDescIdDesc(
+                    farmId, customerId, from, to);
+        } else if (categoryId != null && from != null && to != null) {
+            sales = saleRepository.findByFarmIdAndCategoryIdAndDateBetweenOrderByDateDescIdDesc(
+                    farmId, categoryId, from, to);
+        } else if (customerId != null) {
+            sales = saleRepository.findByFarmIdAndCustomerIdOrderByDateDescIdDesc(farmId, customerId);
+        } else if (categoryId != null) {
+            sales = saleRepository.findByFarmIdAndCategoryIdOrderByDateDescIdDesc(farmId, categoryId);
+        } else if (from != null && to != null) {
+            sales = saleRepository.findByFarmIdAndDateBetweenOrderByDateDescIdDesc(farmId, from, to);
+        } else {
+            sales = saleRepository.findByFarmIdOrderByDateDescIdDesc(farmId);
+        }
+
+        return sales.stream()
+                .filter(s -> customerId == null || s.getCustomer().getId().equals(customerId))
+                .filter(s -> categoryId == null || s.getCategory().getId().equals(categoryId))
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<SaleResponse> getAllWithDues() {
         return saleRepository.findDuesByFarm(farmContext.getCurrentFarmId()).stream()
                 .map(this::toResponse).collect(Collectors.toList());

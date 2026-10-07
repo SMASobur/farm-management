@@ -75,4 +75,16 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @Query("SELECT COUNT(DISTINCT s.customer.id) FROM Sale s " +
             "WHERE s.farm.id = :farmId AND s.dueAmount > 0")
     long countCustomersWithDues(@Param("farmId") Long farmId);
+
+    List<Sale> findByFarmIdOrderByDateDescIdDesc(Long farmId);
+
+    List<Sale> findByFarmIdAndDateBetweenOrderByDateDescIdDesc(Long farmId, LocalDate from, LocalDate to);
+
+    List<Sale> findByFarmIdAndCustomerIdOrderByDateDescIdDesc(Long farmId, Long customerId);
+
+    List<Sale> findByFarmIdAndCategoryIdOrderByDateDescIdDesc(Long farmId, Long categoryId);
+
+    List<Sale> findByFarmIdAndCustomerIdAndDateBetweenOrderByDateDescIdDesc(Long farmId, Long customerId, LocalDate from, LocalDate to);
+
+    List<Sale> findByFarmIdAndCategoryIdAndDateBetweenOrderByDateDescIdDesc(Long farmId, Long categoryId, LocalDate from, LocalDate to);
 }

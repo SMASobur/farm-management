@@ -35,15 +35,11 @@ public class SaleController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long customerId,
             @RequestParam(required = false) Long categoryId) {
 
-        if (from != null && to != null) {
-            return ResponseEntity.ok(ApiResponse.success(saleService.getByRange(from, to)));
-        }
-        if (categoryId != null) {
-            return ResponseEntity.ok(ApiResponse.success(saleService.getByCategory(categoryId)));
-        }
-        return ResponseEntity.ok(ApiResponse.success(saleService.getAll()));
+        return ResponseEntity.ok(ApiResponse.success(
+                saleService.getFiltered(from, to, customerId, categoryId)));
     }
 
     @GetMapping("/{id}")
