@@ -29,9 +29,12 @@ public class SaleService {
     private final FarmContext farmContext;
     private final UnitRepository unitRepository;
 
+    // ============ Create ============
+
     @Transactional
     public SaleResponse create(SaleRequest request) {
         Farm farm = farmContext.getCurrentFarm();
+
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
         if (!customer.getFarm().getId().equals(farm.getId())) {
@@ -40,6 +43,9 @@ public class SaleService {
 
         Category category = loadProductCategory(request.getCategoryId(), farm.getId());
         Unit unit = loadUnit(request.getUnitId(), farm.getId());
+
+        String customProductName = normalizeCustomProductName(
+                request.getCustomProductName(), category);
 
         Sale sale = new Sale();
         sale.setFarm(farm);
@@ -50,6 +56,7 @@ public class SaleService {
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
+        sale.setCustomProductName(customProductName);
 
         BigDecimal total = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
@@ -83,22 +90,13 @@ public class SaleService {
         return toResponse(saved);
     }
 
-    private Unit loadUnit(Long unitId, Long farmId) {
-        Unit unit = unitRepository.findById(unitId)
-                .orElseThrow(() -> new ResourceNotFoundException("Unit not found with id: " + unitId));
-        if (!unit.getFarm().getId().equals(farmId)) {
-            throw new ResourceNotFoundException("Unit not found");
-        }
-        if (!unit.isActive()) {
-            throw new BusinessException("Unit '" + unit.getName() + "' is inactive");
-        }
-        return unit;
-    }
+    // ============ Read ============
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getAll() {
         Long farmId = farmContext.getCurrentFarmId();
-        return saleRepository.findByFarmId(farmId).stream().map(this::toResponse).collect(Collectors.toList());
+        return saleRepository.findByFarmId(farmId).stream()
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -141,7 +139,6 @@ public class SaleService {
         Long farmId = farmContext.getCurrentFarmId();
         List<Sale> sales;
 
-        // Handle the common combinations efficiently at the DB level
         if (customerId != null && from != null && to != null) {
             sales = saleRepository.findByFarmIdAndCustomerIdAndDateBetweenOrderByDateDescIdDesc(
                     farmId, customerId, from, to);
@@ -178,6 +175,8 @@ public class SaleService {
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
+    // ============ Update ============
+
     @Transactional
     public SaleResponse update(Long id, SaleRequest request) {
         Sale sale = findOrThrow(id);
@@ -188,6 +187,9 @@ public class SaleService {
         }
 
         Category category = loadProductCategory(request.getCategoryId(), farmId);
+
+        String customProductName = normalizeCustomProductName(
+                request.getCustomProductName(), category);
 
         BigDecimal newTotal = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
@@ -201,10 +203,13 @@ public class SaleService {
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
+        sale.setCustomProductName(customProductName);
 
         sale.calculateAmounts();
         return toResponse(saleRepository.save(sale));
     }
+
+    // ============ Delete ============
 
     @Transactional
     public void delete(Long id) {
@@ -212,12 +217,15 @@ public class SaleService {
         if (sale.getPaidAmount().signum() > 0) {
             throw new BusinessException("Cannot delete a sale with payments. Delete payments first.");
         }
-        List<Payment> payments = paymentRepository.findByFarmIdAndSaleId(farmContext.getCurrentFarmId(), id);
+        List<Payment> payments = paymentRepository.findByFarmIdAndSaleId(
+                farmContext.getCurrentFarmId(), id);
         if (!payments.isEmpty()) {
             paymentRepository.deleteAll(payments);
         }
         saleRepository.deleteById(id);
     }
+
+    // ============ Summaries ============
 
     @Transactional(readOnly = true)
     public BigDecimal getDailyRevenue(LocalDate date) {
@@ -252,6 +260,41 @@ public class SaleService {
     @Transactional(readOnly = true)
     public BigDecimal getAllDues() {
         return saleRepository.sumAllDuesByFarm(farmContext.getCurrentFarmId());
+    }
+
+    // ============ Helpers ============
+
+    /**
+     * Validates and normalizes the custom product name.
+     * - Only allowed when the category code is "OTHER"
+     * - Blank strings are normalized to null
+     */
+    private String normalizeCustomProductName(String raw, Category category) {
+        boolean isOtherCategory = "OTHER".equals(category.getCode());
+
+        if (raw == null) return null;
+
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) return null;
+
+        if (!isOtherCategory) {
+            throw new BusinessException(
+                    "Custom product name is only allowed when category is 'Other'");
+        }
+
+        return trimmed;
+    }
+
+    private Unit loadUnit(Long unitId, Long farmId) {
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unit not found with id: " + unitId));
+        if (!unit.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Unit not found");
+        }
+        if (!unit.isActive()) {
+            throw new BusinessException("Unit '" + unit.getName() + "' is inactive");
+        }
+        return unit;
     }
 
     private Category loadProductCategory(Long categoryId, Long farmId) {
@@ -299,6 +342,7 @@ public class SaleService {
         response.setTotalAmount(sale.getTotalAmount());
         response.setPaidAmount(sale.getPaidAmount());
         response.setDueAmount(sale.getDueAmount());
+        response.setCustomProductName(sale.getCustomProductName());
         response.setNotes(sale.getNotes());
         response.setCreatedAt(sale.getCreatedAt());
         return response;

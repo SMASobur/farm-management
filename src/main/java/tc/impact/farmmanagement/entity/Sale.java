@@ -34,7 +34,6 @@ public class Sale {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    // CHANGED: was enum, now FK to Unit entity
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "unit_id", nullable = false)
     private Unit unit;
@@ -53,6 +52,9 @@ public class Sale {
 
     @Column(name = "due_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal dueAmount = BigDecimal.ZERO;
+
+    @Column(name = "custom_product_name", length = 100)
+    private String customProductName;
 
     private String notes;
 

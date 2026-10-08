@@ -2,9 +2,9 @@ package tc.impact.farmmanagement.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import tc.impact.farmmanagement.entity.Payment;
-import tc.impact.farmmanagement.entity.Sale;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,10 +18,10 @@ public class SaleRequest {
     @NotNull(message = "Date is required")
     private LocalDate date;
 
-    @NotNull(message = "Category ID is required (e.g., milk, egg, animal)")
+    @NotNull(message = "Category ID is required")
     private Long categoryId;
 
-    @NotNull(message = "Unit is required")
+    @NotNull(message = "Unit ID is required")
     private Long unitId;
 
     @NotNull(message = "Quantity is required")
@@ -31,6 +31,9 @@ public class SaleRequest {
     @NotNull(message = "Unit price is required")
     @Positive(message = "Unit price must be positive")
     private BigDecimal unitPrice;
+
+    @Size(max = 100, message = "Custom product name too long")
+    private String customProductName;
 
     private String notes;
 
