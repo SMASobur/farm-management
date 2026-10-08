@@ -21,8 +21,12 @@ public class SaleRequest {
     @NotNull(message = "Category ID is required")
     private Long categoryId;
 
-    @NotNull(message = "Unit ID is required")
     private Long unitId;
+
+    @Size(max = 50, message = "Custom unit name too long")
+    private String customUnitName;
+
+    private Boolean saveCustomUnitToUnits;
 
     @NotNull(message = "Quantity is required")
     @Positive(message = "Quantity must be positive")
@@ -34,6 +38,8 @@ public class SaleRequest {
 
     @Size(max = 100, message = "Custom product name too long")
     private String customProductName;
+
+    private Boolean saveCustomProductAsCategory;
 
     private String notes;
 

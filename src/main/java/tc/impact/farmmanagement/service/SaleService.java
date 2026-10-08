@@ -42,10 +42,20 @@ public class SaleService {
         }
 
         Category category = loadProductCategory(request.getCategoryId(), farm.getId());
-        Unit unit = loadUnit(request.getUnitId(), farm.getId());
+        Unit unit = resolveUnit(request, farm.getId());
 
-        String customProductName = normalizeCustomProductName(
-                request.getCustomProductName(), category);
+        // === Handle "Save as category" toggle ===
+        String customProductName = null;
+        if (isOtherCategory(category) && hasText(request.getCustomProductName())) {
+            if (Boolean.TRUE.equals(request.getSaveCustomProductAsCategory())) {
+                // Create or reuse a real Category with this name; use it for the sale
+                category = findOrCreateCategoryForFarm(request.getCustomProductName().trim(), farm);
+                customProductName = null;
+            } else {
+                // One-time only — keep the OTHER category and store the name on the sale
+                customProductName = request.getCustomProductName().trim();
+            }
+        }
 
         Sale sale = new Sale();
         sale.setFarm(farm);
@@ -90,7 +100,7 @@ public class SaleService {
         return toResponse(saved);
     }
 
-    // ============ Read ============
+    // ============ Read (unchanged) ============
 
     @Transactional(readOnly = true)
     public List<SaleResponse> getAll() {
@@ -187,9 +197,18 @@ public class SaleService {
         }
 
         Category category = loadProductCategory(request.getCategoryId(), farmId);
+        Unit unit = resolveUnit(request, farmId);
 
-        String customProductName = normalizeCustomProductName(
-                request.getCustomProductName(), category);
+        String customProductName = null;
+        if (isOtherCategory(category) && hasText(request.getCustomProductName())) {
+            if (Boolean.TRUE.equals(request.getSaveCustomProductAsCategory())) {
+                category = findOrCreateCategoryForFarm(request.getCustomProductName().trim(),
+                        farmContext.getCurrentFarm());
+                customProductName = null;
+            } else {
+                customProductName = request.getCustomProductName().trim();
+            }
+        }
 
         BigDecimal newTotal = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
@@ -199,7 +218,7 @@ public class SaleService {
 
         sale.setDate(request.getDate());
         sale.setCategory(category);
-        sale.setUnit(loadUnit(request.getUnitId(), farmId));
+        sale.setUnit(unit);
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
@@ -209,7 +228,7 @@ public class SaleService {
         return toResponse(saleRepository.save(sale));
     }
 
-    // ============ Delete ============
+    // ============ Delete (unchanged) ============
 
     @Transactional
     public void delete(Long id) {
@@ -225,7 +244,7 @@ public class SaleService {
         saleRepository.deleteById(id);
     }
 
-    // ============ Summaries ============
+    // ============ Summaries (unchanged) ============
 
     @Transactional(readOnly = true)
     public BigDecimal getDailyRevenue(LocalDate date) {
@@ -265,24 +284,87 @@ public class SaleService {
     // ============ Helpers ============
 
     /**
-     * Validates and normalizes the custom product name.
-     * - Only allowed when the category code is "OTHER"
-     * - Blank strings are normalized to null
+     * Resolves the sale's unit. Two modes:
+     *   - Existing unit: request.unitId provided
+     *   - New custom unit: request.customUnitName provided
+     *       → reuses by code if exists, else creates a new farm-scoped unit
+     *       → when saveCustomUnitToUnits is false, creates an inactive unit
+     *         (hidden from future dropdowns but satisfies the FK)
      */
-    private String normalizeCustomProductName(String raw, Category category) {
-        boolean isOtherCategory = "OTHER".equals(category.getCode());
+    private Unit resolveUnit(SaleRequest request, Long farmId) {
+        boolean hasUnitId = request.getUnitId() != null;
+        boolean hasCustomName = hasText(request.getCustomUnitName());
 
-        if (raw == null) return null;
-
-        String trimmed = raw.trim();
-        if (trimmed.isEmpty()) return null;
-
-        if (!isOtherCategory) {
-            throw new BusinessException(
-                    "Custom product name is only allowed when category is 'Other'");
+        if (hasUnitId && hasCustomName) {
+            throw new BusinessException("Provide either unitId or customUnitName, not both");
+        }
+        if (!hasUnitId && !hasCustomName) {
+            throw new BusinessException("Unit is required");
         }
 
-        return trimmed;
+        if (hasUnitId) {
+            return loadUnit(request.getUnitId(), farmId);
+        }
+
+        // Custom unit — normalize name to code
+        String name = request.getCustomUnitName().trim();
+        String code = normalizeCode(name);
+        if (code.isEmpty()) {
+            throw new BusinessException("Invalid unit name");
+        }
+        if (code.length() > 20) {
+            code = code.substring(0, 20);
+        }
+
+        var existing = unitRepository.findByFarmIdAndCode(farmId, code);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        boolean saveForReuse = Boolean.TRUE.equals(request.getSaveCustomUnitToUnits());
+
+        Farm farm = farmContext.getCurrentFarm();
+        Unit unit = new Unit();
+        unit.setFarm(farm);
+        unit.setCode(code);
+        unit.setName(name);
+        unit.setNameBn(null);
+        unit.setAbbreviation(null);
+        unit.setActive(saveForReuse);   // hidden from dropdowns when not saved for reuse
+        unit.setSystemDefault(false);
+        unit.setDisplayOrder(999);
+        return unitRepository.save(unit);
+    }
+
+    /**
+     * Finds a PRODUCT category with the given name for the farm, or creates one.
+     * Used when the user checks "Save 'X' as a category".
+     */
+    private Category findOrCreateCategoryForFarm(String name, Farm farm) {
+        String code = normalizeCode(name);
+        if (code.isEmpty()) {
+            throw new BusinessException("Invalid category name");
+        }
+        if (code.length() > 50) {
+            code = code.substring(0, 50);
+        }
+
+        var existing = categoryRepository.findByFarmIdAndCodeAndType(
+                farm.getId(), code, Category.CategoryType.PRODUCT);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        Category category = new Category();
+        category.setFarm(farm);
+        category.setCode(code);
+        category.setName(name);
+        category.setNameBn(null);
+        category.setType(Category.CategoryType.PRODUCT);
+        category.setActive(true);
+        category.setSystemDefault(false);
+        category.setDisplayOrder(999);
+        return categoryRepository.save(category);
     }
 
     private Unit loadUnit(Long unitId, Long farmId) {
@@ -320,6 +402,28 @@ public class SaleService {
             throw new ResourceNotFoundException("Sale not found with id: " + id);
         }
         return sale;
+    }
+
+    private boolean isOtherCategory(Category category) {
+        return "OTHER".equalsIgnoreCase(category.getCode());
+    }
+
+    private boolean hasText(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    /**
+     * Normalizes a display name into a code:
+     *   - Uppercase
+     *   - Keep Unicode letters + numbers
+     *   - Replace runs of non-word chars with a single underscore
+     *   - Trim leading/trailing underscores
+     */
+    private String normalizeCode(String name) {
+        return name.trim()
+                .toUpperCase()
+                .replaceAll("[^\\p{L}\\p{N}]+", "_")
+                .replaceAll("^_+|_+$", "");
     }
 
     SaleResponse toResponse(Sale sale) {
