@@ -28,13 +28,13 @@ public class Customer {
     @Column(nullable = false)
     private String name;
 
-    @Column(unique = true)
     private String phone;
 
     private String address;
 
-    @Enumerated(EnumType.STRING)
-    private CustomerType type;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_type_id")
+    private CustomerType customerType;
 
     private String notes;
 
@@ -44,12 +44,5 @@ public class Customer {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDate.now();
-        if (this.type == null) {
-            this.type = CustomerType.HOUSEHOLD;
-        }
-    }
-
-    public enum CustomerType {
-        HOUSEHOLD, SHOP, TEA_STALL, RESTAURANT, WHOLESALER, OTHER
     }
 }

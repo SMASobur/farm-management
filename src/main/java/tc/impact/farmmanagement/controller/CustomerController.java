@@ -29,13 +29,13 @@ public class CustomerController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<CustomerResponse>>> getAll(
             @RequestParam(required = false) String name,
-            @RequestParam(required = false) Customer.CustomerType type) {
+            @RequestParam(required = false) Long customerTypeId) {
 
         if (name != null && !name.isBlank()) {
             return ResponseEntity.ok(ApiResponse.success(customerService.searchByName(name)));
         }
-        if (type != null) {
-            return ResponseEntity.ok(ApiResponse.success(customerService.getByType(type)));
+        if (customerTypeId != null) {
+            return ResponseEntity.ok(ApiResponse.success(customerService.getByType(customerTypeId)));
         }
         return ResponseEntity.ok(ApiResponse.success(customerService.getAll()));
     }

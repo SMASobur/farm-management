@@ -1,7 +1,6 @@
 package tc.impact.farmmanagement.dto.response;
 
 import lombok.Data;
-import tc.impact.farmmanagement.entity.Customer;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,8 +11,13 @@ public class CustomerResponse {
     private String name;
     private String phone;
     private String address;
-    private Customer.CustomerType type;
+
+    private Long customerTypeId;
+    private String customerTypeCode;
+    private String customerTypeName;
+    private String customerTypeNameBn;
+
     private String notes;
     private LocalDate createdAt;
-    private BigDecimal totalDue;   // populated on-demand in service
+    private BigDecimal totalDue;
 }
