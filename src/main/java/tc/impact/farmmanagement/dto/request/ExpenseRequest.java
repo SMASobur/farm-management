@@ -17,6 +17,8 @@ public class ExpenseRequest {
     @NotNull(message = "Category ID is required")
     private Long categoryId;
 
+    private Long workerId;
+
     @NotBlank(message = "Description is required")
     @Size(max = 255)
     private String description;

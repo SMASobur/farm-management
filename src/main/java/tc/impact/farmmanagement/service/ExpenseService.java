@@ -10,10 +10,12 @@ import tc.impact.farmmanagement.dto.response.ExpenseResponse;
 import tc.impact.farmmanagement.entity.Category;
 import tc.impact.farmmanagement.entity.Expense;
 import tc.impact.farmmanagement.entity.Farm;
+import tc.impact.farmmanagement.entity.Worker;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.CategoryRepository;
 import tc.impact.farmmanagement.repository.ExpenseRepository;
+import tc.impact.farmmanagement.repository.WorkerRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -27,23 +29,30 @@ public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final CategoryRepository categoryRepository;
+    private final WorkerRepository workerRepository;
     private final FarmContext farmContext;
+
+    // ============ Create ============
 
     @Transactional
     public ExpenseResponse create(ExpenseRequest request) {
         Farm farm = farmContext.getCurrentFarm();
         Category category = loadCategory(request.getCategoryId(), farm.getId());
+        Worker worker = resolveWorker(request.getWorkerId(), farm.getId());
 
         Expense expense = new Expense();
         expense.setFarm(farm);
         expense.setDate(request.getDate() != null ? request.getDate() : LocalDate.now());
         expense.setCategory(category);
+        expense.setWorker(worker);
         expense.setDescription(request.getDescription());
         expense.setAmount(request.getAmount());
         expense.setNotes(request.getNotes());
 
         return toResponse(expenseRepository.save(expense));
     }
+
+    // ============ Read ============
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getAll() {
@@ -83,18 +92,23 @@ public class ExpenseService {
     public List<ExpenseResponse> getByCategoryAndRange(Long categoryId, LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
         Long farmId = farmContext.getCurrentFarmId();
-        return expenseRepository.findByFarmIdAndCategoryIdAndDateBetweenOrderByDateAsc(farmId, categoryId, from, to).stream()
+        return expenseRepository.findByFarmIdAndCategoryIdAndDateBetweenOrderByDateAsc(
+                        farmId, categoryId, from, to).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
+
+    // ============ Update ============
 
     @Transactional
     public ExpenseResponse update(Long id, ExpenseRequest request) {
         Long farmId = farmContext.getCurrentFarmId();
         Expense expense = findOrThrow(id);
         Category category = loadCategory(request.getCategoryId(), farmId);
+        Worker worker = resolveWorker(request.getWorkerId(), farmId);
 
         expense.setDate(request.getDate() != null ? request.getDate() : expense.getDate());
         expense.setCategory(category);
+        expense.setWorker(worker);
         expense.setDescription(request.getDescription());
         expense.setAmount(request.getAmount());
         expense.setNotes(request.getNotes());
@@ -102,11 +116,15 @@ public class ExpenseService {
         return toResponse(expenseRepository.save(expense));
     }
 
+    // ============ Delete ============
+
     @Transactional
     public void delete(Long id) {
         Expense expense = findOrThrow(id);
         expenseRepository.deleteById(expense.getId());
     }
+
+    // ============ Summaries ============
 
     @Transactional(readOnly = true)
     public BigDecimal getDailyTotal(LocalDate date) {
@@ -134,6 +152,18 @@ public class ExpenseService {
                         (String) row[0],
                         ((BigDecimal) row[1]).setScale(2, RoundingMode.HALF_UP)))
                 .collect(Collectors.toList());
+    }
+
+    // ============ Helpers ============
+
+    private Worker resolveWorker(Long workerId, Long farmId) {
+        if (workerId == null) return null;
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Worker not found with id: " + workerId));
+        if (!worker.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Worker not found with id: " + workerId);
+        }
+        return worker;
     }
 
     private Category loadCategory(Long categoryId, Long farmId) {
@@ -173,6 +203,10 @@ public class ExpenseService {
         response.setAmount(e.getAmount());
         response.setNotes(e.getNotes());
         response.setCreatedAt(e.getCreatedAt());
+        if (e.getWorker() != null) {
+            response.setWorkerId(e.getWorker().getId());
+            response.setWorkerName(e.getWorker().getName());
+        }
         return response;
     }
 }
