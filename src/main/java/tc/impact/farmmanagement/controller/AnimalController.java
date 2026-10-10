@@ -29,22 +29,19 @@ public class AnimalController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<AnimalResponse>>> getAllAnimals(
-            @RequestParam(required = false) Animal.Species species,
+            @RequestParam(required = false) Long speciesId,
             @RequestParam(required = false) Animal.AnimalStatus status) {
 
         List<AnimalResponse> animals;
-
-        if (species != null && status != null) {
-            animals = animalService.getAnimalsBySpeciesAndStatus(species, status);
-        } else if (species != null) {
-            animals = animalService.getAnimalsBySpecies(species);
+        if (speciesId != null && status != null) {
+            animals = animalService.getAnimalsBySpeciesAndStatus(speciesId, status);
+        } else if (speciesId != null) {
+            animals = animalService.getAnimalsBySpecies(speciesId);
         } else {
             animals = animalService.getAllAnimals();
         }
-
         return ResponseEntity.ok(ApiResponse.success(animals));
     }
-
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<AnimalResponse>> getAnimalById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(animalService.getAnimalById(id)));
@@ -61,11 +58,5 @@ public class AnimalController {
     public ResponseEntity<ApiResponse<Void>> deleteAnimal(@PathVariable Long id) {
         animalService.deleteAnimal(id);
         return ResponseEntity.ok(ApiResponse.success("Animal deleted", null));
-    }
-
-    // Endpoint to fetch species list (useful for frontend dropdowns)
-    @GetMapping("/species")
-    public ResponseEntity<ApiResponse<Animal.Species[]>> getSpeciesList() {
-        return ResponseEntity.ok(ApiResponse.success(Animal.Species.values()));
     }
 }

@@ -1,7 +1,6 @@
 package tc.impact.farmmanagement.dto.response;
 
 import lombok.Data;
-import tc.impact.farmmanagement.entity.Animal;
 
 import java.time.LocalDate;
 
@@ -10,10 +9,15 @@ public class AnimalResponse {
     private Long id;
     private String tagNumber;
     private String name;
-    private Animal.Species species;
-    private Animal.AnimalStatus status;
-    private Animal.Gender gender;
+
+    private Long speciesId;
+    private String speciesCode;
+    private String speciesName;
+    private String speciesNameBn;
+
+    private String status;
+    private String gender;
     private LocalDate dateOfBirth;
     private LocalDate createdAt;
-    private boolean milkProducer;   // convenience flag for frontend
+    private boolean milkProducer;
 }

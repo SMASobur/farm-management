@@ -180,8 +180,11 @@ public class EggProductionService {
     }
 
     private void validateAnimalLaysEggs(Animal animal) {
-        boolean isBird = animal.getSpecies() == Animal.Species.CHICKEN || animal.getSpecies() == Animal.Species.DUCK;
-        if (!isBird) throw new BusinessException("Animal '" + animal.getTagNumber() + "' does not lay eggs");
+        String speciesCode = animal.getSpecies() != null ? animal.getSpecies().getCode() : null;
+        boolean isBird = "CHICKEN".equals(speciesCode) || "DUCK".equals(speciesCode) || "GOOSE".equals(speciesCode);
+        if (!isBird) {
+            throw new BusinessException("Animal '" + animal.getTagNumber() + "' (" + speciesCode + ") does not lay eggs");
+        }
         if (animal.getStatus() == Animal.AnimalStatus.DEAD || animal.getStatus() == Animal.AnimalStatus.SOLD) {
             throw new BusinessException("Cannot record eggs for animal with status " + animal.getStatus());
         }

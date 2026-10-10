@@ -12,20 +12,19 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
     List<Animal> findByFarmId(Long farmId);
 
+    List<Animal> findByFarmIdAndSpeciesId(Long farmId, Long speciesId);
+
+    List<Animal> findByFarmIdAndStatus(Long farmId, Animal.AnimalStatus status);
+
+    List<Animal> findByFarmIdAndSpeciesIdAndStatus(Long farmId, Long speciesId, Animal.AnimalStatus status);
+
     Optional<Animal> findByFarmIdAndTagNumber(Long farmId, String tagNumber);
 
     boolean existsByFarmIdAndTagNumber(Long farmId, String tagNumber);
 
-    List<Animal> findByFarmIdAndSpecies(Long farmId, Animal.Species species);
-
-    List<Animal> findByFarmIdAndStatus(Long farmId, Animal.AnimalStatus status);
-
-    List<Animal> findByFarmIdAndSpeciesAndStatus(Long farmId, Animal.Species species, Animal.AnimalStatus status);
-
     long countByFarmId(Long farmId);
 
-    long countByFarmIdAndSpecies(Long farmId, Animal.Species species);
+    long countByFarmIdAndSpeciesId(Long farmId, Long speciesId);
 
-    long countByFarmIdAndStatus(Long farmId, Animal.AnimalStatus status);
-
+    long countByFarmIdAndSpeciesCode(Long farmId, String speciesCode);
 }

@@ -15,7 +15,7 @@ import tc.impact.farmmanagement.repository.UserRepository;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Order(3) // runs after FarmSeeder(1) and CategorySeeder(2)
+@Order(5) // runs after FarmSeeder(1) and CategorySeeder(2)
 public class AdminSeeder implements CommandLineRunner {
 
     private final UserRepository userRepository;

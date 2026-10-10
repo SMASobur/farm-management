@@ -332,7 +332,7 @@ public class SaleService {
         unit.setAbbreviation(null);
         unit.setActive(saveForReuse);   // hidden from dropdowns when not saved for reuse
         unit.setSystemDefault(false);
-        unit.setDisplayOrder(999);
+        unit.setDisplayOrder(900);
         return unitRepository.save(unit);
     }
 
@@ -363,7 +363,7 @@ public class SaleService {
         category.setType(Category.CategoryType.PRODUCT);
         category.setActive(true);
         category.setSystemDefault(false);
-        category.setDisplayOrder(999);
+        category.setDisplayOrder(900);
         return categoryRepository.save(category);
     }
 

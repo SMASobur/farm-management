@@ -30,8 +30,8 @@ public class Animal {
 
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "species_id", nullable = false)
     private Species species;
 
     @Enumerated(EnumType.STRING)
@@ -55,40 +55,18 @@ public class Animal {
         }
     }
 
-    // ---------- Enums ----------
-
-    public enum Species {
-        COW,        // গরু
-        GOAT,       // ছাগল
-        SHEEP,      // ভেড়া
-        CHICKEN,    // মুরগি
-        DUCK,       // হাঁস
-        BUFFALO,    // মহিষ
-        OTHER
-    }
-
     public enum AnimalStatus {
-        ACTIVE,      // Healthy, producing (milk/eggs) or being raised
-        PREGNANT,    // Expecting offspring
-        DRY,         // Not producing milk (resting)
-        SICK,        // Under treatment
-        SOLD,        // Sold
-        DEAD         // Deceased
+        ACTIVE, PREGNANT, DRY, SICK, SOLD, DEAD
     }
 
     public enum Gender {
-        MALE,
-        FEMALE,
-        UNKNOWN
+        MALE, FEMALE, UNKNOWN
     }
 
-    // ---------- Helper: Is this animal a milk producer? ----------
-
+    /**
+     * Milk producer status is now determined by the species.
+     */
     public boolean isMilkProducer() {
-        boolean isMilkSpecies = this.species == Species.COW
-                || this.species == Species.GOAT
-                || this.species == Species.SHEEP
-                || this.species == Species.BUFFALO;
-        return isMilkSpecies && this.gender == Gender.FEMALE;
+        return species != null && species.isMilkProducer();
     }
 }

@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tc.impact.farmmanagement.dto.response.DashboardSummaryResponse;
-import tc.impact.farmmanagement.entity.Animal;
 import tc.impact.farmmanagement.entity.Flock;
 import tc.impact.farmmanagement.repository.AnimalRepository;
 import tc.impact.farmmanagement.repository.CustomerRepository;
@@ -101,12 +100,12 @@ public class DashboardService {
     private DashboardSummaryResponse.CountsSection buildCounts(Long farmId) {
         DashboardSummaryResponse.CountsSection s = new DashboardSummaryResponse.CountsSection();
         s.setTotalAnimals(animalRepository.countByFarmId(farmId));
-        s.setCows(animalRepository.countByFarmIdAndSpecies(farmId, Animal.Species.COW));
-        s.setGoats(animalRepository.countByFarmIdAndSpecies(farmId, Animal.Species.GOAT));
-        s.setSheep(animalRepository.countByFarmIdAndSpecies(farmId, Animal.Species.SHEEP));
-        s.setChickens(animalRepository.countByFarmIdAndSpecies(farmId, Animal.Species.CHICKEN));
-        s.setDucks(animalRepository.countByFarmIdAndSpecies(farmId, Animal.Species.DUCK));
-        s.setBuffaloes(animalRepository.countByFarmIdAndSpecies(farmId, Animal.Species.BUFFALO));
+        s.setCows(animalRepository.countByFarmIdAndSpeciesCode(farmId, "COW"));
+        s.setGoats(animalRepository.countByFarmIdAndSpeciesCode(farmId, "GOAT"));
+        s.setSheep(animalRepository.countByFarmIdAndSpeciesCode(farmId, "SHEEP"));
+        s.setChickens(animalRepository.countByFarmIdAndSpeciesCode(farmId, "CHICKEN"));
+        s.setDucks(animalRepository.countByFarmIdAndSpeciesCode(farmId, "DUCK"));
+        s.setBuffaloes(animalRepository.countByFarmIdAndSpeciesCode(farmId, "BUFFALO"));
         s.setActiveFlocks(flockRepository.countByFarmIdAndStatus(farmId, Flock.FlockStatus.ACTIVE));
         s.setTotalCustomers(customerRepository.countByFarmId(farmId));
         return s;
