@@ -67,6 +67,13 @@ public class AnimalService {
     }
 
     @Transactional(readOnly = true)
+    public List<AnimalResponse> getAnimalsByStatus(Animal.AnimalStatus status) {
+        Long farmId = farmContext.getCurrentFarmId();
+        return animalRepository.findByFarmIdAndStatus(farmId, status).stream()
+                .map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<AnimalResponse> getAnimalsBySpeciesAndStatus(Long speciesId, Animal.AnimalStatus status) {
         Long farmId = farmContext.getCurrentFarmId();
         return animalRepository.findByFarmIdAndSpeciesIdAndStatus(farmId, speciesId, status).stream()

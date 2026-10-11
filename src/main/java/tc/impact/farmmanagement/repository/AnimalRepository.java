@@ -27,4 +27,6 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
     long countByFarmIdAndSpeciesId(Long farmId, Long speciesId);
 
     long countByFarmIdAndSpeciesCode(Long farmId, String speciesCode);
+
+
 }

@@ -37,11 +37,14 @@ public class AnimalController {
             animals = animalService.getAnimalsBySpeciesAndStatus(speciesId, status);
         } else if (speciesId != null) {
             animals = animalService.getAnimalsBySpecies(speciesId);
+        } else if (status != null) {
+            animals = animalService.getAnimalsByStatus(status);
         } else {
             animals = animalService.getAllAnimals();
         }
         return ResponseEntity.ok(ApiResponse.success(animals));
     }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<AnimalResponse>> getAnimalById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(animalService.getAnimalById(id)));
