@@ -11,6 +11,7 @@ import tc.impact.farmmanagement.entity.*;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.*;
+import tc.impact.farmmanagement.util.UserDisplayUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -67,6 +68,7 @@ public class SaleService {
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
         sale.setCustomProductName(customProductName);
+        sale.setEnteredBy(farmContext.getCurrentUser());
 
         BigDecimal total = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
@@ -449,6 +451,10 @@ public class SaleService {
         response.setCustomProductName(sale.getCustomProductName());
         response.setNotes(sale.getNotes());
         response.setCreatedAt(sale.getCreatedAt());
+        if (sale.getEnteredBy() != null) {
+            response.setEnteredByUserId(sale.getEnteredBy().getId());
+            response.setEnteredByName(UserDisplayUtil.displayName(sale.getEnteredBy()));
+        }
         return response;
     }
 }

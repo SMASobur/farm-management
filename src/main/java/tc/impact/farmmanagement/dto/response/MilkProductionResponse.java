@@ -15,4 +15,6 @@ public class MilkProductionResponse {
     private Double noonLiters;
     private Double nightLiters;
     private Double totalLiters;
+    private Long enteredByUserId;
+    private String enteredByName;
 }

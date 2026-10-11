@@ -4,6 +4,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import tc.impact.farmmanagement.entity.Farm;
+import tc.impact.farmmanagement.entity.User;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.security.CustomUserPrincipal;
 
@@ -29,6 +30,11 @@ public class FarmContext {
 
     public Long getCurrentFarmId() {
         return getPrincipal().getFarmId();
+    }
+
+    public User getCurrentUser() {
+        CustomUserPrincipal principal = getPrincipal();
+        return principal.getUser();
     }
 
     private CustomUserPrincipal getPrincipal() {

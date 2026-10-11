@@ -23,6 +23,10 @@ public class Expense {
     @JoinColumn(name = "farm_id", nullable = false)
     private Farm farm;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "entered_by_user_id")
+    private User enteredBy;
+
     @Column(nullable = false)
     private LocalDate date;
 

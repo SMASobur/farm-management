@@ -13,6 +13,7 @@ import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.AnimalRepository;
 import tc.impact.farmmanagement.repository.MilkProductionRepository;
+import tc.impact.farmmanagement.util.UserDisplayUtil;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -47,6 +48,7 @@ public class MilkProductionService {
         production.setMorningLiters(safe(request.getMorningLiters()));
         production.setNoonLiters(safe(request.getNoonLiters()));
         production.setNightLiters(safe(request.getNightLiters()));
+        production.setEnteredBy(farmContext.getCurrentUser());
 
         return toResponse(milkRepository.save(production));
     }
@@ -172,6 +174,10 @@ public class MilkProductionService {
         response.setNoonLiters(m.getNoonLiters());
         response.setNightLiters(m.getNightLiters());
         response.setTotalLiters(m.getTotalLiters());
+        if (m.getEnteredBy() != null) {
+            response.setEnteredByUserId(m.getEnteredBy().getId());
+            response.setEnteredByName(UserDisplayUtil.displayName(m.getEnteredBy()));
+        }
         return response;
     }
 }

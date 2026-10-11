@@ -16,6 +16,7 @@ import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.CategoryRepository;
 import tc.impact.farmmanagement.repository.ExpenseRepository;
 import tc.impact.farmmanagement.repository.WorkerRepository;
+import tc.impact.farmmanagement.util.UserDisplayUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -48,6 +49,7 @@ public class ExpenseService {
         expense.setDescription(request.getDescription());
         expense.setAmount(request.getAmount());
         expense.setNotes(request.getNotes());
+        expense.setEnteredBy(farmContext.getCurrentUser());
 
         return toResponse(expenseRepository.save(expense));
     }
@@ -215,6 +217,11 @@ public class ExpenseService {
         if (e.getWorker() != null) {
             response.setWorkerId(e.getWorker().getId());
             response.setWorkerName(e.getWorker().getName());
+        }
+
+        if (e.getEnteredBy() != null) {
+            response.setEnteredByUserId(e.getEnteredBy().getId());
+            response.setEnteredByName(UserDisplayUtil.displayName(e.getEnteredBy()));
         }
         return response;
     }

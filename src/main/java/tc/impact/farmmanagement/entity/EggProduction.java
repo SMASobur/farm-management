@@ -23,6 +23,10 @@ public class EggProduction {
     private Farm farm;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "entered_by_user_id")
+    private User enteredBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "animal_id")
     private Animal animal;
 

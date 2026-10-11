@@ -15,6 +15,7 @@ import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.AnimalRepository;
 import tc.impact.farmmanagement.repository.EggProductionRepository;
 import tc.impact.farmmanagement.repository.FlockRepository;
+import tc.impact.farmmanagement.util.UserDisplayUtil;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -39,6 +40,7 @@ public class EggProductionService {
         production.setDate(request.getDate());
         production.setGoodEggs(safe(request.getGoodEggs()));
         production.setCrackedEggs(safe(request.getCrackedEggs()));
+        production.setEnteredBy(farmContext.getCurrentUser());
 
         if (request.getAnimalId() != null) {
             Animal animal = animalRepository.findById(request.getAnimalId())
@@ -211,6 +213,11 @@ public class EggProductionService {
         response.setSourceDisplayName(e.getSourceDisplayName());
         if (e.getAnimal() != null) response.setAnimalId(e.getAnimal().getId());
         if (e.getFlock() != null) response.setFlockId(e.getFlock().getId());
+
+        if (e.getEnteredBy() != null) {
+            response.setEnteredByUserId(e.getEnteredBy().getId());
+            response.setEnteredByName(UserDisplayUtil.displayName(e.getEnteredBy()));
+        }
         return response;
     }
 }

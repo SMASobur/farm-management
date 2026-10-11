@@ -19,4 +19,6 @@ public class ExpenseResponse {
     private BigDecimal amount;
     private String notes;
     private LocalDate createdAt;
+    private Long enteredByUserId;
+    private String enteredByName;
 }

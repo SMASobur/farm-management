@@ -35,4 +35,7 @@ public class SaleResponse {
     private String notes;
 
     private LocalDate createdAt;
+
+    private Long enteredByUserId;
+    private String enteredByName;
 }
