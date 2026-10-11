@@ -25,6 +25,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     List<Expense> findByFarmIdAndCategoryIdAndDateBetweenOrderByDateAsc(Long farmId, Long categoryId, LocalDate from, LocalDate to);
 
+    List<Expense> findByFarmIdAndWorkerIdOrderByDateDesc(Long farmId, Long workerId);
+
     long countByCategoryId(Long categoryId);
 
     // ============ Aggregations ============

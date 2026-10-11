@@ -68,6 +68,11 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success("Expense deleted", null));
     }
 
+    @GetMapping("/worker/{workerId}")
+    public ResponseEntity<ApiResponse<List<ExpenseResponse>>> getByWorker(@PathVariable Long workerId) {
+        return ResponseEntity.ok(ApiResponse.success(expenseService.getByWorker(workerId)));
+    }
+
     @GetMapping("/date/{date}")
     public ResponseEntity<ApiResponse<List<ExpenseResponse>>> getByDate(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {

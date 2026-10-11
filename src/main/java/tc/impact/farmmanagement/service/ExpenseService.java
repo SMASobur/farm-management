@@ -89,6 +89,15 @@ public class ExpenseService {
     }
 
     @Transactional(readOnly = true)
+    public List<ExpenseResponse> getByWorker(Long workerId) {
+        Long farmId = farmContext.getCurrentFarmId();
+        return expenseRepository.findByFarmIdAndWorkerIdOrderByDateDesc(farmId, workerId)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<ExpenseResponse> getByCategoryAndRange(Long categoryId, LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new BusinessException("'from' date cannot be after 'to' date");
         Long farmId = farmContext.getCurrentFarmId();
