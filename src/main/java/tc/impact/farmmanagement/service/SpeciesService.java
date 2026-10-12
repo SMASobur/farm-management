@@ -33,6 +33,7 @@ public class SpeciesService {
         r.setName(s.getName());
         r.setNameBn(s.getNameBn());
         r.setMilkProducer(s.isMilkProducer());
+        r.setEggProducer(s.isEggProducer());
         r.setActive(s.isActive());
         r.setSystemDefault(s.isSystemDefault());
         r.setDisplayOrder(s.getDisplayOrder());

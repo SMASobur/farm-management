@@ -63,12 +63,13 @@ public class Animal {
         MALE, FEMALE, UNKNOWN
     }
 
-    /**
-     * Milk producer status is now determined by the species.
-     */
     public boolean isMilkProducer() {
         if (species == null || !species.isMilkProducer()) return false;
-        // Only female milk-producing species produce milk
+        return this.gender == Gender.FEMALE;
+    }
+
+    public boolean isEggProducer() {
+        if (species == null || !species.isEggProducer()) return false;
         return this.gender == Gender.FEMALE;
     }
 }

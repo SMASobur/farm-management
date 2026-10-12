@@ -34,13 +34,11 @@ public class Species {
     @Column(name = "name_bn", length = 100)
     private String nameBn;
 
-    /**
-     * True for milk-producing species (cow, goat, sheep, buffalo).
-     * False for non-milk species (chicken, duck, etc.).
-     * When null/unknown for custom species, defaults to false.
-     */
     @Column(name = "milk_producer", nullable = false)
     private boolean milkProducer = false;
+
+    @Column(name = "egg_producer", nullable = false)
+    private boolean eggProducer = false;
 
     @Column(nullable = false)
     private boolean active = true;

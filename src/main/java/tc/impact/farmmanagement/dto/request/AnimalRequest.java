@@ -30,6 +30,8 @@ public class AnimalRequest {
      * and saved for reuse on this farm.
      */
     private Boolean saveCustomSpecies;
+    private Boolean customSpeciesMilkProducer;
+    private Boolean customSpeciesEggProducer;
 
     // These are enums — Jackson converts "ACTIVE" → Animal.AnimalStatus.ACTIVE
     private Animal.AnimalStatus status;
@@ -37,4 +39,5 @@ public class AnimalRequest {
     private Animal.Gender gender;
 
     private LocalDate dateOfBirth;
+
 }

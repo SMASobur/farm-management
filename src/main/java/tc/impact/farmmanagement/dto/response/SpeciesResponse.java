@@ -11,6 +11,7 @@ public class SpeciesResponse {
     private String name;
     private String nameBn;
     private boolean milkProducer;
+    private boolean eggProducer;
     private boolean active;
     private boolean systemDefault;
     private Integer displayOrder;

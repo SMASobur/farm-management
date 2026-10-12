@@ -20,4 +20,5 @@ public class AnimalResponse {
     private LocalDate dateOfBirth;
     private LocalDate createdAt;
     private boolean milkProducer;
+    private boolean eggProducer;
 }

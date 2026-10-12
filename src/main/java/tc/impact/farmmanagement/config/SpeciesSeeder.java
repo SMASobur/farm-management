@@ -32,15 +32,16 @@ public class SpeciesSeeder implements CommandLineRunner {
     private void seedDefaults(Farm farm) {
         // code, name, nameBn, milkProducer, displayOrder
         List<Species> defaults = List.of(
-                sp("COW",     "Cow",     "গরু",   true,  10),
-                sp("GOAT",    "Goat",    "ছাগল",  true,  20),
-                sp("SHEEP",   "Sheep",   "ভেড়া",  true,  30),
-                sp("BUFFALO", "Buffalo", "মহিষ",  true,  40),
-                sp("CHICKEN", "Chicken", "মুরগি", false, 50),
-                sp("DUCK",    "Duck",    "হাঁস",   false, 60),
-                sp("GOOSE",   "Goose",   "রাজহাঁস", false, 70),
-                sp("OTHER",   "Other",   "অন্যান্য", false, 999)
+                sp("COW",     "Cow",     "গরু",     true,  false, 10),
+                sp("GOAT",    "Goat",    "ছাগল",    true,  false, 20),
+                sp("SHEEP",   "Sheep",   "ভেড়া",    true,  false, 30),
+                sp("BUFFALO", "Buffalo", "মহিষ",    true,  false, 40),
+                sp("CHICKEN", "Chicken", "মুরগি",   false, true,  50),
+                sp("DUCK",    "Duck",    "হাঁস",     false, true,  60),
+                sp("GOOSE",   "Goose",   "রাজহাঁস",  false, true,  70),
+                sp("OTHER",   "Other",   "অন্যান্য", false, false, 999)
         );
+
 
         for (Species template : defaults) {
             template.setFarm(farm);
@@ -52,12 +53,13 @@ public class SpeciesSeeder implements CommandLineRunner {
         }
     }
 
-    private Species sp(String code, String name, String nameBn, boolean milkProducer, int order) {
+    private Species sp(String code, String name, String nameBn, boolean milkProducer, boolean eggProducer, int order) {
         Species s = new Species();
         s.setCode(code);
         s.setName(name);
         s.setNameBn(nameBn);
         s.setMilkProducer(milkProducer);
+        s.setEggProducer(eggProducer);
         s.setDisplayOrder(order);
         s.setActive(true);
         s.setSystemDefault(true);

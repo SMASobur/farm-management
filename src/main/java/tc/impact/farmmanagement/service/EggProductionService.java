@@ -182,10 +182,12 @@ public class EggProductionService {
     }
 
     private void validateAnimalLaysEggs(Animal animal) {
-        String speciesCode = animal.getSpecies() != null ? animal.getSpecies().getCode() : null;
-        boolean isBird = "CHICKEN".equals(speciesCode) || "DUCK".equals(speciesCode) || "GOOSE".equals(speciesCode);
-        if (!isBird) {
-            throw new BusinessException("Animal '" + animal.getTagNumber() + "' (" + speciesCode + ") does not lay eggs");
+        if (animal.getSpecies() == null || !animal.getSpecies().isEggProducer()) {
+            String speciesName = animal.getSpecies() != null ? animal.getSpecies().getName() : "unknown";
+            throw new BusinessException("Species '" + speciesName + "' does not produce eggs");
+        }
+        if (animal.getGender() != Animal.Gender.FEMALE) {
+            throw new BusinessException("Only female animals lay eggs");
         }
         if (animal.getStatus() == Animal.AnimalStatus.DEAD || animal.getStatus() == Animal.AnimalStatus.SOLD) {
             throw new BusinessException("Cannot record eggs for animal with status " + animal.getStatus());

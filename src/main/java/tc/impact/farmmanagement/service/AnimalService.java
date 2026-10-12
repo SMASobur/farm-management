@@ -131,14 +131,6 @@ public class AnimalService {
         return animal;
     }
 
-    /**
-     * Resolves the species. Two modes:
-     *   - Existing species: request.speciesId provided
-     *   - Custom species: request.customSpeciesName provided
-     *       → reused by code if exists, else created
-     *       → when saveCustomSpecies=true, becomes systemDefault=false + active
-     *       → when false/omitted, still created but marked active=false (hidden)
-     */
     private Species resolveSpecies(AnimalRequest request, Farm farm) {
         boolean hasSpeciesId = request.getSpeciesId() != null;
         boolean hasCustomName = request.getCustomSpeciesName() != null
@@ -185,7 +177,8 @@ public class AnimalService {
         sp.setCode(code);
         sp.setName(name);
         sp.setNameBn(null);
-        sp.setMilkProducer(false);   // custom species default to non-milk
+        sp.setMilkProducer(Boolean.TRUE.equals(request.getCustomSpeciesMilkProducer()));
+        sp.setEggProducer(Boolean.TRUE.equals(request.getCustomSpeciesEggProducer()));
         sp.setActive(saveForReuse);
         sp.setSystemDefault(false);
         sp.setDisplayOrder(900);
@@ -240,6 +233,7 @@ public class AnimalService {
         response.setDateOfBirth(animal.getDateOfBirth());
         response.setCreatedAt(animal.getCreatedAt());
         response.setMilkProducer(animal.isMilkProducer());
+        response.setEggProducer(animal.isEggProducer());
         return response;
     }
 }
