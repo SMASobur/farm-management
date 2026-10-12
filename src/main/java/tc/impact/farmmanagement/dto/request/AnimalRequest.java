@@ -17,27 +17,22 @@ public class AnimalRequest {
     @Size(max = 100)
     private String name;
 
-    /**
-     * Either speciesId OR customSpeciesName must be provided.
-     */
     private Long speciesId;
 
     @Size(max = 100)
     private String customSpeciesName;
 
-    /**
-     * When true and customSpeciesName is provided, a new Species is created
-     * and saved for reuse on this farm.
-     */
-    private Boolean saveCustomSpecies;
+    @Size(max = 100)
+    private String customSpeciesNameBn;
+
     private Boolean customSpeciesMilkProducer;
     private Boolean customSpeciesEggProducer;
 
-    // These are enums — Jackson converts "ACTIVE" → Animal.AnimalStatus.ACTIVE
+    private Boolean saveCustomSpecies;
+
     private Animal.AnimalStatus status;
 
     private Animal.Gender gender;
 
     private LocalDate dateOfBirth;
-
 }

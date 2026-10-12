@@ -155,7 +155,6 @@ public class AnimalService {
             return sp;
         }
 
-        // Custom species — normalize to code
         String name = request.getCustomSpeciesName().trim();
         String code = normalizeCode(name);
         if (code.isEmpty()) {
@@ -176,7 +175,10 @@ public class AnimalService {
         sp.setFarm(farm);
         sp.setCode(code);
         sp.setName(name);
-        sp.setNameBn(null);
+        sp.setNameBn(
+                request.getCustomSpeciesNameBn() != null
+                        ? request.getCustomSpeciesNameBn().trim()
+                        : null);
         sp.setMilkProducer(Boolean.TRUE.equals(request.getCustomSpeciesMilkProducer()));
         sp.setEggProducer(Boolean.TRUE.equals(request.getCustomSpeciesEggProducer()));
         sp.setActive(saveForReuse);
