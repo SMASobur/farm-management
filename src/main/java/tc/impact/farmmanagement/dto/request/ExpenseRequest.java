@@ -29,4 +29,12 @@ public class ExpenseRequest {
 
     @Size(max = 500)
     private String notes;
+
+    @Size(max = 100)
+    private String customCategoryNameEn;
+
+    @Size(max = 100)
+    private String customCategoryNameBn;
+
+    private Boolean saveCustomCategory;
 }

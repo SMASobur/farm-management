@@ -38,7 +38,7 @@ public class ExpenseService {
     @Transactional
     public ExpenseResponse create(ExpenseRequest request) {
         Farm farm = farmContext.getCurrentFarm();
-        Category category = loadCategory(request.getCategoryId(), farm.getId());
+        Category category = resolveCategory(request, farm);
         Worker worker = resolveWorker(request.getWorkerId(), farm.getId());
 
         Expense expense = new Expense();
@@ -200,6 +200,69 @@ public class ExpenseService {
             throw new ResourceNotFoundException("Expense not found with id: " + id);
         }
         return expense;
+    }
+
+    private Category resolveCategory(ExpenseRequest request, Farm farm) {
+        Category category = loadCategory(request.getCategoryId(), farm.getId());
+
+        boolean isOther = "OTHER".equalsIgnoreCase(category.getCode());
+        boolean hasCustomName = request.getCustomCategoryNameEn() != null
+                && !request.getCustomCategoryNameEn().isBlank();
+
+        if (!isOther) {
+            if (hasCustomName) {
+                throw new BusinessException(
+                        "Custom category name is only allowed when category is 'Other'");
+            }
+            return category;
+        }
+
+        // Category is OTHER
+        if (!hasCustomName) {
+            return category;
+        }
+
+        if (!Boolean.TRUE.equals(request.getSaveCustomCategory())) {
+            return category;
+        }
+
+        // Create or reuse a new EXPENSE category
+        String nameEn = request.getCustomCategoryNameEn().trim();
+        String code = normalizeCode(nameEn);
+        if (code.isEmpty()) {
+            throw new BusinessException("Invalid custom category name");
+        }
+        if (code.length() > 50) {
+            code = code.substring(0, 50);
+        }
+
+        // Reuse if exists
+        var existing = categoryRepository.findByFarmIdAndCodeAndType(
+                farm.getId(), code, Category.CategoryType.EXPENSE);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        Category newCategory = new Category();
+        newCategory.setFarm(farm);
+        newCategory.setCode(code);
+        newCategory.setName(nameEn);
+        newCategory.setNameBn(
+                request.getCustomCategoryNameBn() != null
+                        ? request.getCustomCategoryNameBn().trim()
+                        : null);
+        newCategory.setType(Category.CategoryType.EXPENSE);
+        newCategory.setActive(true);
+        newCategory.setSystemDefault(false);
+        newCategory.setDisplayOrder(900);
+        return categoryRepository.save(newCategory);
+    }
+
+    private String normalizeCode(String name) {
+        return name.trim()
+                .toUpperCase()
+                .replaceAll("[^\\p{L}\\p{N}]+", "_")
+                .replaceAll("^_+|_+$", "");
     }
 
     private ExpenseResponse toResponse(Expense e) {
