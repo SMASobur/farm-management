@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import tc.impact.farmmanagement.dto.response.MonthlyReportResponse;
 import tc.impact.farmmanagement.entity.Farm;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -23,6 +25,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExportService {
 
     private final ReportService reportService;
@@ -327,6 +330,71 @@ public class ExportService {
         k.setCellStyle(labelStyle);
         row.createCell(1).setCellValue((value != null ? value : BigDecimal.ZERO) + "%");
         return rowNum;
+    }
+
+    // ============================================================
+    // Log HELPERS
+    // ============================================================
+
+
+    private void addFarmHeader(Document document, Farm farm) throws DocumentException, IOException {
+        Font titleFont = new Font(Font.HELVETICA, 20, Font.BOLD, new Color(20, 40, 80));
+        Font subtitleFont = new Font(Font.HELVETICA, 10, Font.ITALIC, new Color(100, 100, 100));
+
+        if (farm.getLogoUrl() != null && !farm.getLogoUrl().isBlank()) {
+            try {
+                // Fetch the logo image from Cloudinary
+                Image logo = Image.getInstance(new java.net.URL(farm.getLogoUrl()));
+                logo.scaleToFit(60, 60);
+
+                // Create a 2-column table: logo | name + location
+                PdfPTable headerTable = new PdfPTable(2);
+                headerTable.setWidthPercentage(100);
+                headerTable.setWidths(new float[]{1, 4});
+
+                PdfPCell logoCell = new PdfPCell(logo, false);
+                logoCell.setBorder(Rectangle.NO_BORDER);
+                logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                logoCell.setPaddingRight(15);
+                headerTable.addCell(logoCell);
+
+                // Name + location cell
+                Paragraph namePara = new Paragraph(farm.getName(), titleFont);
+                PdfPCell textCell = new PdfPCell();
+                textCell.setBorder(Rectangle.NO_BORDER);
+                textCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                textCell.addElement(namePara);
+                if (farm.getLocation() != null && !farm.getLocation().isBlank()) {
+                    textCell.addElement(new Paragraph(farm.getLocation(), subtitleFont));
+                }
+                headerTable.addCell(textCell);
+
+                document.add(headerTable);
+            } catch (Exception e) {
+                log.warn("Failed to load farm logo, falling back to text only: {}", e.getMessage());
+                // Fallback: just text
+                Paragraph farmName = new Paragraph(farm.getName(), titleFont);
+                farmName.setAlignment(Element.ALIGN_CENTER);
+                document.add(farmName);
+                if (farm.getLocation() != null && !farm.getLocation().isBlank()) {
+                    Paragraph loc = new Paragraph(farm.getLocation(), subtitleFont);
+                    loc.setAlignment(Element.ALIGN_CENTER);
+                    document.add(loc);
+                }
+            }
+        } else {
+            // No logo — center-aligned text
+            Paragraph farmName = new Paragraph(farm.getName(), titleFont);
+            farmName.setAlignment(Element.ALIGN_CENTER);
+            document.add(farmName);
+            if (farm.getLocation() != null && !farm.getLocation().isBlank()) {
+                Paragraph loc = new Paragraph(farm.getLocation(), subtitleFont);
+                loc.setAlignment(Element.ALIGN_CENTER);
+                document.add(loc);
+            }
+        }
+
+        document.add(Chunk.NEWLINE);
     }
 
     // ============================================================

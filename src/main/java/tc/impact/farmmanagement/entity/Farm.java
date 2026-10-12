@@ -22,7 +22,7 @@ public class Farm {
     private String name;
 
     @Column(name = "code", unique = true, nullable = false, length = 50)
-    private String code;   // e.g., "MAA-DAIRY" — used for URLs, subdomains later
+    private String code;
 
     @Column(name = "location", length = 255)
     private String location;
@@ -35,6 +35,9 @@ public class Farm {
 
     @Column(name = "owner_email", length = 150)
     private String ownerEmail;
+
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "plan", nullable = false, length = 20)
