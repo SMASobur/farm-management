@@ -195,7 +195,10 @@ public class CustomerService {
         type.setFarm(farm);
         type.setCode(code);
         type.setName(name);
-        type.setNameBn(null);
+        type.setNameBn(
+                request.getCustomTypeNameBn() != null
+                        ? request.getCustomTypeNameBn().trim()
+                        : null);
         type.setActive(saveForReuse);
         type.setSystemDefault(false);
         type.setDisplayOrder(900);
