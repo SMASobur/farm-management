@@ -10,6 +10,10 @@ import tc.impact.farmmanagement.dto.response.ApiResponse;
 import tc.impact.farmmanagement.dto.response.CustomerResponse;
 import tc.impact.farmmanagement.entity.Customer;
 import tc.impact.farmmanagement.service.CustomerService;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import java.time.LocalDate;
 
 import java.util.List;
 
@@ -38,6 +42,21 @@ public class CustomerController {
             return ResponseEntity.ok(ApiResponse.success(customerService.getByType(customerTypeId)));
         }
         return ResponseEntity.ok(ApiResponse.success(customerService.getAll()));
+    }
+
+    @GetMapping("/{id}/statement.pdf")
+    public ResponseEntity<byte[]> downloadStatement(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+
+        byte[] pdf = customerService.generateStatementPdf(id, from, to);
+        String filename = "customer-statement-" + id + "-" + from + "-to-" + to + ".pdf";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @GetMapping("/{id}")

@@ -6,14 +6,15 @@ import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import tc.impact.farmmanagement.dto.response.MonthlyReportResponse;
+import tc.impact.farmmanagement.entity.Customer;
 import tc.impact.farmmanagement.entity.Farm;
-
-import lombok.extern.slf4j.Slf4j;
+import tc.impact.farmmanagement.entity.Sale;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -44,32 +45,27 @@ public class ExportService {
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-            // ---------- Styles ----------
             CellStyle titleStyle = createTitleStyle(workbook);
             CellStyle headerStyle = createHeaderStyle(workbook);
             CellStyle currencyStyle = createCurrencyStyle(workbook);
             CellStyle numberStyle = createNumberStyle(workbook);
             CellStyle labelStyle = createLabelStyle(workbook);
 
-            // ---------- Sheet 1: Summary ----------
             Sheet summary = workbook.createSheet("Summary");
             int row = 0;
 
-            // Title
             org.apache.poi.ss.usermodel.Row titleRow = summary.createRow(row++);
             Cell titleCell = titleRow.createCell(0);
             titleCell.setCellValue(farm.getName() + " — Profit & Loss Report");
             titleCell.setCellStyle(titleStyle);
 
-            // Period
             org.apache.poi.ss.usermodel.Row periodRow = summary.createRow(row++);
             periodRow.createCell(0).setCellValue("Period:");
             periodRow.getCell(0).setCellStyle(labelStyle);
             periodRow.createCell(1).setCellValue(from.format(DATE_FMT) + " to " + to.format(DATE_FMT));
 
-            row++; // blank
+            row++;
 
-            // Revenue section
             row = writeSectionHeader(summary, row, "REVENUE", headerStyle);
             row = writeKeyValue(summary, row, "Gross Sales", report.getRevenue().getGrossSales(), currencyStyle, labelStyle);
             row = writeKeyValue(summary, row, "Cash Collected", report.getRevenue().getCashCollected(), currencyStyle, labelStyle);
@@ -82,9 +78,8 @@ public class ExportService {
                 }
             }
 
-            row++; // blank
+            row++;
 
-            // Expenses section
             row = writeSectionHeader(summary, row, "EXPENSES", headerStyle);
             row = writeKeyValue(summary, row, "Total Expenses", report.getExpenses().getTotal(), currencyStyle, labelStyle);
 
@@ -95,21 +90,18 @@ public class ExportService {
                 }
             }
 
-            row++; // blank
+            row++;
 
-            // Production section
             row = writeSectionHeader(summary, row, "PRODUCTION", headerStyle);
             row = writeKeyValueNumber(summary, row, "Milk Produced (L)", report.getProduction().getMilkLiters(), numberStyle, labelStyle);
             row = writeKeyValueNumber(summary, row, "Eggs Produced", report.getProduction().getEggs() != null ? report.getProduction().getEggs().doubleValue() : 0.0, numberStyle, labelStyle);
 
-            row++; // blank
+            row++;
 
-            // Profit section
             row = writeSectionHeader(summary, row, "PROFIT", headerStyle);
             row = writeKeyValue(summary, row, "Net Profit", report.getProfit().getNetProfit(), currencyStyle, labelStyle);
             row = writeKeyValuePercent(summary, row, "Profit Margin", report.getProfit().getProfitMargin(), labelStyle);
 
-            // Auto-size columns
             summary.autoSizeColumn(0);
             summary.autoSizeColumn(1);
 
@@ -122,7 +114,7 @@ public class ExportService {
     }
 
     // ============================================================
-    // PDF EXPORT
+    // PDF EXPORT — P&L REPORT
     // ============================================================
 
     public byte[] exportReportAsPdf(LocalDate from, LocalDate to) {
@@ -134,8 +126,6 @@ public class ExportService {
             PdfWriter.getInstance(document, out);
             document.open();
 
-            // Fonts
-            Font titleFont = new Font(Font.HELVETICA, 18, Font.BOLD, new Color(20, 40, 80));
             Font subtitleFont = new Font(Font.HELVETICA, 10, Font.ITALIC, new Color(100, 100, 100));
             Font sectionFont = new Font(Font.HELVETICA, 12, Font.BOLD, new Color(20, 40, 80));
             Font labelFont = new Font(Font.HELVETICA, 10, Font.NORMAL);
@@ -143,10 +133,8 @@ public class ExportService {
             Font profitFont = new Font(Font.HELVETICA, 14, Font.BOLD, new Color(0, 128, 0));
             Font lossFont = new Font(Font.HELVETICA, 14, Font.BOLD, new Color(200, 0, 0));
 
-            // Title
-            Paragraph title = new Paragraph(farm.getName(), titleFont);
-            title.setAlignment(Element.ALIGN_CENTER);
-            document.add(title);
+            // Farm header with logo
+            addFarmHeader(document, farm);
 
             Paragraph subtitle = new Paragraph(
                     "Profit & Loss Report — " + from.format(DATE_FMT) + " to " + to.format(DATE_FMT),
@@ -211,7 +199,6 @@ public class ExportService {
             margin.setAlignment(Element.ALIGN_CENTER);
             document.add(margin);
 
-            // Footer
             Paragraph footer = new Paragraph(
                     "\nGenerated on " + LocalDate.now().format(DATE_FMT) + " | Farm Management System",
                     new Font(Font.HELVETICA, 8, Font.ITALIC, new Color(150, 150, 150)));
@@ -228,7 +215,141 @@ public class ExportService {
     }
 
     // ============================================================
-    // EXCEL HELPERS
+    // PDF EXPORT — CUSTOMER STATEMENT
+    // ============================================================
+
+    public byte[] exportCustomerStatementAsPdf(
+            Customer customer,
+            java.util.List<Sale> sales,       // ← fully-qualified to avoid OpenPDF's List
+            BigDecimal totalSales,
+            BigDecimal totalPaid,
+            BigDecimal totalDue,
+            LocalDate from,
+            LocalDate to) {
+
+        Farm farm = farmContext.getCurrentFarm();
+
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Document document = new Document(PageSize.A4, 50, 50, 50, 50);
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font sectionFont = new Font(Font.HELVETICA, 12, Font.BOLD, new Color(20, 40, 80));
+            Font labelFont = new Font(Font.HELVETICA, 10, Font.NORMAL);
+            Font valueFont = new Font(Font.HELVETICA, 10, Font.BOLD);
+            Font tableHeaderFont = new Font(Font.HELVETICA, 10, Font.BOLD, Color.WHITE);
+            Font tableCellFont = new Font(Font.HELVETICA, 9, Font.NORMAL);
+
+            addFarmHeader(document, farm);
+
+            Paragraph title = new Paragraph("STATEMENT OF ACCOUNT",
+                    new Font(Font.HELVETICA, 14, Font.BOLD));
+            title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingBefore(10);
+            title.setSpacingAfter(20);
+            document.add(title);
+
+            // Customer details
+            addSection(document, "Customer Details", sectionFont);
+            addKeyValue(document, "Name", customer.getName(), labelFont, valueFont);
+            if (customer.getPhone() != null && !customer.getPhone().isBlank()) {
+                addKeyValue(document, "Phone", customer.getPhone(), labelFont, valueFont);
+            }
+            if (customer.getAddress() != null && !customer.getAddress().isBlank()) {
+                addKeyValue(document, "Address", customer.getAddress(), labelFont, valueFont);
+            }
+            addKeyValue(document, "Period",
+                    from.format(DATE_FMT) + "  —  " + to.format(DATE_FMT),
+                    labelFont, valueFont);
+
+            document.add(Chunk.NEWLINE);
+
+            // Sales table
+            addSection(document, "Transaction History", sectionFont);
+
+            if (sales.isEmpty()) {
+                Paragraph noSales = new Paragraph("No sales in this period.", labelFont);
+                noSales.setSpacingBefore(10);
+                document.add(noSales);
+            } else {
+                PdfPTable table = new PdfPTable(5);
+                table.setWidthPercentage(100);
+                table.setWidths(new float[]{1.2f, 3f, 1.2f, 1.3f, 1.3f});
+                table.setSpacingBefore(8);
+
+                String[] headers = {"Date", "Item", "Qty", "Amount", "Paid"};
+                for (String h : headers) {
+                    PdfPCell cell = new PdfPCell(new Phrase(h, tableHeaderFont));
+                    cell.setBackgroundColor(new Color(20, 40, 80));
+                    cell.setPadding(6);
+                    table.addCell(cell);
+                }
+
+                for (Sale sale : sales) {
+                    addTableCell(table, sale.getDate().format(DATE_FMT), tableCellFont, Element.ALIGN_LEFT);
+
+                    String itemName = sale.getCustomProductName() != null
+                            ? sale.getCustomProductName()
+                            : sale.getCategory().getName();
+                    String qtyUnit = sale.getQuantity().stripTrailingZeros().toPlainString()
+                            + " " + (sale.getUnit().getAbbreviation() != null
+                            ? sale.getUnit().getAbbreviation()
+                            : sale.getUnit().getName());
+
+                    addTableCell(table, itemName, tableCellFont, Element.ALIGN_LEFT);
+                    addTableCell(table, qtyUnit, tableCellFont, Element.ALIGN_LEFT);
+                    addTableCell(table, formatMoney(sale.getTotalAmount()), tableCellFont, Element.ALIGN_RIGHT);
+                    addTableCell(table, formatMoney(sale.getPaidAmount()), tableCellFont, Element.ALIGN_RIGHT);
+                }
+
+                document.add(table);
+            }
+
+            document.add(Chunk.NEWLINE);
+            document.add(Chunk.NEWLINE);
+
+            // Summary
+            addSection(document, "Summary", sectionFont);
+            addKeyValue(document, "Total Sales", formatMoney(totalSales), labelFont, valueFont);
+            addKeyValue(document, "Total Paid", formatMoney(totalPaid), labelFont, valueFont);
+
+            Paragraph dueLabel = new Paragraph("Outstanding Due",
+                    new Font(Font.HELVETICA, 12, Font.BOLD));
+            dueLabel.setSpacingBefore(10);
+            document.add(dueLabel);
+
+            Font dueFont = totalDue.signum() > 0
+                    ? new Font(Font.HELVETICA, 18, Font.BOLD, new Color(200, 100, 0))
+                    : new Font(Font.HELVETICA, 18, Font.BOLD, new Color(0, 128, 0));
+
+            Paragraph dueAmount = new Paragraph(formatMoney(totalDue), dueFont);
+            document.add(dueAmount);
+
+            Paragraph footer = new Paragraph(
+                    "\nGenerated on " + LocalDate.now().format(DATE_FMT)
+                            + " · Farm Management System",
+                    new Font(Font.HELVETICA, 8, Font.ITALIC, new Color(150, 150, 150)));
+            footer.setAlignment(Element.ALIGN_CENTER);
+            footer.setSpacingBefore(30);
+            document.add(footer);
+
+            document.close();
+            return out.toByteArray();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate customer statement", e);
+        }
+    }
+
+    private void addTableCell(PdfPTable table, String text, Font font, int alignment) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setPadding(5);
+        cell.setHorizontalAlignment(alignment);
+        table.addCell(cell);
+    }
+
+    // ============================================================
+    // EXCEL HELPERS (unchanged)
     // ============================================================
 
     private CellStyle createTitleStyle(Workbook wb) {
@@ -333,9 +454,8 @@ public class ExportService {
     }
 
     // ============================================================
-    // Log HELPERS
+    // PDF HELPERS
     // ============================================================
-
 
     private void addFarmHeader(Document document, Farm farm) throws DocumentException, IOException {
         Font titleFont = new Font(Font.HELVETICA, 20, Font.BOLD, new Color(20, 40, 80));
@@ -343,11 +463,9 @@ public class ExportService {
 
         if (farm.getLogoUrl() != null && !farm.getLogoUrl().isBlank()) {
             try {
-                // Fetch the logo image from Cloudinary
                 Image logo = Image.getInstance(new java.net.URL(farm.getLogoUrl()));
                 logo.scaleToFit(60, 60);
 
-                // Create a 2-column table: logo | name + location
                 PdfPTable headerTable = new PdfPTable(2);
                 headerTable.setWidthPercentage(100);
                 headerTable.setWidths(new float[]{1, 4});
@@ -358,7 +476,6 @@ public class ExportService {
                 logoCell.setPaddingRight(15);
                 headerTable.addCell(logoCell);
 
-                // Name + location cell
                 Paragraph namePara = new Paragraph(farm.getName(), titleFont);
                 PdfPCell textCell = new PdfPCell();
                 textCell.setBorder(Rectangle.NO_BORDER);
@@ -372,7 +489,6 @@ public class ExportService {
                 document.add(headerTable);
             } catch (Exception e) {
                 log.warn("Failed to load farm logo, falling back to text only: {}", e.getMessage());
-                // Fallback: just text
                 Paragraph farmName = new Paragraph(farm.getName(), titleFont);
                 farmName.setAlignment(Element.ALIGN_CENTER);
                 document.add(farmName);
@@ -383,7 +499,6 @@ public class ExportService {
                 }
             }
         } else {
-            // No logo — center-aligned text
             Paragraph farmName = new Paragraph(farm.getName(), titleFont);
             farmName.setAlignment(Element.ALIGN_CENTER);
             document.add(farmName);
@@ -396,10 +511,6 @@ public class ExportService {
 
         document.add(Chunk.NEWLINE);
     }
-
-    // ============================================================
-    // PDF HELPERS
-    // ============================================================
 
     private void addSection(Document document, String label, Font font) throws DocumentException {
         Paragraph p = new Paragraph(label, font);

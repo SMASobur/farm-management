@@ -8,12 +8,15 @@ import tc.impact.farmmanagement.dto.response.CustomerResponse;
 import tc.impact.farmmanagement.entity.Customer;
 import tc.impact.farmmanagement.entity.CustomerType;
 import tc.impact.farmmanagement.entity.Farm;
+import tc.impact.farmmanagement.entity.Sale;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.CustomerRepository;
 import tc.impact.farmmanagement.repository.CustomerTypeRepository;
 import tc.impact.farmmanagement.repository.SaleRepository;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,6 +28,7 @@ public class CustomerService {
     private final CustomerTypeRepository customerTypeRepository;
     private final SaleRepository saleRepository;
     private final FarmContext farmContext;
+    private final ExportService exportService;
 
     // ============ Create ============
 
@@ -126,6 +130,34 @@ public class CustomerService {
         customerRepository.deleteById(id);
     }
 
+    // ============ Statement PDF ============
+
+    @Transactional(readOnly = true)
+    public byte[] generateStatementPdf(Long customerId, LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new BusinessException("'from' date cannot be after 'to' date");
+        }
+
+        Long farmId = farmContext.getCurrentFarmId();
+        Customer customer = findOrThrow(customerId);
+
+        List<Sale> sales = saleRepository.findByFarmIdAndCustomerIdAndDateBetweenOrderByDateAsc(
+                farmId, customerId, from, to);
+
+        BigDecimal totalSales = sales.stream()
+                .map(Sale::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalPaid = sales.stream()
+                .map(Sale::getPaidAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalDue = totalSales.subtract(totalPaid);
+
+        return exportService.exportCustomerStatementAsPdf(
+                customer, sales, totalSales, totalPaid, totalDue, from, to);
+    }
+
     // ============ Helpers ============
 
     private Customer findOrThrow(Long id) {
@@ -138,13 +170,6 @@ public class CustomerService {
         return customer;
     }
 
-    /**
-     * Resolves the customer type. Two modes:
-     *   - Existing type: request.customerTypeId provided
-     *   - Custom type: request.customTypeName provided
-     *       → reuses by code if exists, else creates
-     *   - Neither provided: defaults to the farm's HOUSEHOLD type
-     */
     private CustomerType resolveCustomerType(CustomerRequest request, Farm farm) {
         boolean hasTypeId = request.getCustomerTypeId() != null;
         boolean hasCustomName = request.getCustomTypeName() != null
