@@ -91,12 +91,6 @@ public class SaleController {
 
     // ============ Revenue summaries ============
 
-    @GetMapping("/summary/daily")
-    public ResponseEntity<ApiResponse<BigDecimal>> getDailyRevenue(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(ApiResponse.success(saleService.getDailyRevenue(date)));
-    }
-
     @GetMapping("/summary/range")
     public ResponseEntity<ApiResponse<List<DailyRevenueSummaryResponse>>> getRangeRevenue(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

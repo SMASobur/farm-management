@@ -23,8 +23,14 @@ public class SaleRequest {
 
     private Long unitId;
 
-    @Size(max = 50, message = "Custom unit name too long")
+    @Size(max = 50)
     private String customUnitName;
+
+    @Size(max = 50)
+    private String customUnitNameBn;
+
+    @Size(max = 10)
+    private String customUnitAbbreviation;
 
     private Boolean saveCustomUnitToUnits;
 
@@ -36,8 +42,13 @@ public class SaleRequest {
     @Positive(message = "Unit price must be positive")
     private BigDecimal unitPrice;
 
-    @Size(max = 100, message = "Custom product name too long")
+    @Size(max = 100)
     private String customProductName;
+
+    @Size(max = 100)
+    private String customProductNameBn;
+
+    private Long customProductDefaultUnitId;
 
     private Boolean saveCustomProductAsCategory;
 
