@@ -33,10 +33,10 @@ public class Animal {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "species_id", nullable = false)
     private Species species;
-
+    
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AnimalStatus status;
+    @Column(name = "lifecycle_status", nullable = false, length = 20)
+    private LifecycleStatus lifecycleStatus;
 
     @Enumerated(EnumType.STRING)
     private Gender gender;
@@ -50,13 +50,16 @@ public class Animal {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDate.now();
-        if (this.status == null) {
-            this.status = AnimalStatus.ACTIVE;
+        if (this.lifecycleStatus == null) {
+            this.lifecycleStatus = LifecycleStatus.ACTIVE;
         }
     }
 
-    public enum AnimalStatus {
-        ACTIVE, PREGNANT, DRY, SICK, SOLD, DEAD
+    public enum LifecycleStatus {
+        ACTIVE,    // being raised normally
+        SOLD,      // sold to someone
+        DEAD,      // deceased
+        CULLED     // removed from herd (retired, transferred, slaughtered for personal use)
     }
 
     public enum Gender {
@@ -64,12 +67,11 @@ public class Animal {
     }
 
     public boolean isMilkProducer() {
-        if (species == null || !species.isMilkProducer()) return false;
-        return this.gender == Gender.FEMALE;
+        boolean isMilkSpecies = species != null && species.isMilkProducer();
+        return isMilkSpecies && gender == Gender.FEMALE;
     }
 
-    public boolean isEggProducer() {
-        if (species == null || !species.isEggProducer()) return false;
-        return this.gender == Gender.FEMALE;
+    public boolean isActive() {
+        return lifecycleStatus == LifecycleStatus.ACTIVE;
     }
 }

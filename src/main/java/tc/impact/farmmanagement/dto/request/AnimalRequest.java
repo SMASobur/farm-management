@@ -25,12 +25,9 @@ public class AnimalRequest {
     @Size(max = 100)
     private String customSpeciesNameBn;
 
-    private Boolean customSpeciesMilkProducer;
-    private Boolean customSpeciesEggProducer;
-
     private Boolean saveCustomSpecies;
 
-    private Animal.AnimalStatus status;
+    private Animal.LifecycleStatus lifecycleStatus;
 
     private Animal.Gender gender;
 

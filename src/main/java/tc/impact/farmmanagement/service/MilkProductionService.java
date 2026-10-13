@@ -149,13 +149,12 @@ public class MilkProductionService {
 
     private void validateAnimalCanProduceMilk(Animal animal) {
         if (!animal.isMilkProducer()) {
-            throw new BusinessException("Animal '" + animal.getTagNumber() + "' (" + animal.getSpecies() + ") does not produce milk");
+            throw new BusinessException("Animal '" + animal.getTagNumber() + "' (" + animal.getSpecies().getName() + ") does not produce milk");
         }
-        if (animal.getStatus() == Animal.AnimalStatus.DEAD || animal.getStatus() == Animal.AnimalStatus.SOLD) {
-            throw new BusinessException("Cannot record milk for animal '" + animal.getTagNumber() + "' with status " + animal.getStatus());
-        }
-        if (animal.getStatus() == Animal.AnimalStatus.DRY) {
-            throw new BusinessException("Animal '" + animal.getTagNumber() + "' is marked DRY");
+        if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD
+                || animal.getLifecycleStatus() == Animal.LifecycleStatus.SOLD
+                || animal.getLifecycleStatus() == Animal.LifecycleStatus.CULLED) {
+            throw new BusinessException("Cannot record milk for animal with status " + animal.getLifecycleStatus());
         }
     }
 

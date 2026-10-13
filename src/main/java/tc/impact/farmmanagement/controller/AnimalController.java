@@ -30,15 +30,13 @@ public class AnimalController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<AnimalResponse>>> getAllAnimals(
             @RequestParam(required = false) Long speciesId,
-            @RequestParam(required = false) Animal.AnimalStatus status) {
+            @RequestParam(required = false) Animal.LifecycleStatus status) {
 
         List<AnimalResponse> animals;
         if (speciesId != null && status != null) {
             animals = animalService.getAnimalsBySpeciesAndStatus(speciesId, status);
         } else if (speciesId != null) {
             animals = animalService.getAnimalsBySpecies(speciesId);
-        } else if (status != null) {
-            animals = animalService.getAnimalsByStatus(status);
         } else {
             animals = animalService.getAllAnimals();
         }

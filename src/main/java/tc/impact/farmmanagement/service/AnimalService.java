@@ -11,8 +11,11 @@ import tc.impact.farmmanagement.entity.Species;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.AnimalRepository;
+import tc.impact.farmmanagement.repository.MilkProductionRepository;
+import tc.impact.farmmanagement.repository.ProductionEventRepository;
 import tc.impact.farmmanagement.repository.SpeciesRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +25,8 @@ public class AnimalService {
 
     private final AnimalRepository animalRepository;
     private final SpeciesRepository speciesRepository;
+    private final ProductionEventRepository eventRepository;
+    private final MilkProductionRepository milkRepository;
     private final FarmContext farmContext;
 
     // ============ Create ============
@@ -41,11 +46,11 @@ public class AnimalService {
         animal.setTagNumber(request.getTagNumber());
         animal.setName(request.getName());
         animal.setSpecies(species);
-        animal.setStatus(request.getStatus() != null ? request.getStatus() : Animal.AnimalStatus.ACTIVE);
+        animal.setLifecycleStatus(request.getLifecycleStatus() != null
+                ? request.getLifecycleStatus()
+                : Animal.LifecycleStatus.ACTIVE);
         animal.setGender(request.getGender());
         animal.setDateOfBirth(request.getDateOfBirth());
-
-        validateAnimalRules(animal);
 
         return toResponse(animalRepository.save(animal));
     }
@@ -67,16 +72,10 @@ public class AnimalService {
     }
 
     @Transactional(readOnly = true)
-    public List<AnimalResponse> getAnimalsByStatus(Animal.AnimalStatus status) {
+    public List<AnimalResponse> getAnimalsBySpeciesAndStatus(
+            Long speciesId, Animal.LifecycleStatus status) {
         Long farmId = farmContext.getCurrentFarmId();
-        return animalRepository.findByFarmIdAndStatus(farmId, status).stream()
-                .map(this::toResponse).collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<AnimalResponse> getAnimalsBySpeciesAndStatus(Long speciesId, Animal.AnimalStatus status) {
-        Long farmId = farmContext.getCurrentFarmId();
-        return animalRepository.findByFarmIdAndSpeciesIdAndStatus(farmId, speciesId, status).stream()
+        return animalRepository.findByFarmIdAndSpeciesIdAndLifecycleStatus(farmId, speciesId, status).stream()
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -102,11 +101,11 @@ public class AnimalService {
         animal.setTagNumber(request.getTagNumber());
         animal.setName(request.getName());
         animal.setSpecies(species);
-        animal.setStatus(request.getStatus());
+        if (request.getLifecycleStatus() != null) {
+            animal.setLifecycleStatus(request.getLifecycleStatus());
+        }
         animal.setGender(request.getGender());
         animal.setDateOfBirth(request.getDateOfBirth());
-
-        validateAnimalRules(animal);
 
         return toResponse(animalRepository.save(animal));
     }
@@ -145,7 +144,8 @@ public class AnimalService {
 
         if (hasSpeciesId) {
             Species sp = speciesRepository.findById(request.getSpeciesId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Species not found with id: " + request.getSpeciesId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Species not found with id: " + request.getSpeciesId()));
             if (!sp.getFarm().getId().equals(farm.getId())) {
                 throw new ResourceNotFoundException("Species not found");
             }
@@ -175,43 +175,15 @@ public class AnimalService {
         sp.setFarm(farm);
         sp.setCode(code);
         sp.setName(name);
-        sp.setNameBn(
-                request.getCustomSpeciesNameBn() != null
-                        ? request.getCustomSpeciesNameBn().trim()
-                        : null);
-        sp.setMilkProducer(Boolean.TRUE.equals(request.getCustomSpeciesMilkProducer()));
-        sp.setEggProducer(Boolean.TRUE.equals(request.getCustomSpeciesEggProducer()));
+        sp.setNameBn(request.getCustomSpeciesNameBn() != null
+                ? request.getCustomSpeciesNameBn().trim()
+                : null);
+        sp.setMilkProducer(false);
+        sp.setEggProducer(false);
         sp.setActive(saveForReuse);
         sp.setSystemDefault(false);
         sp.setDisplayOrder(900);
         return speciesRepository.save(sp);
-    }
-
-    private void validateAnimalRules(Animal animal) {
-        Animal.Gender gender = animal.getGender();
-        Animal.AnimalStatus status = animal.getStatus();
-
-        boolean isFemale = gender == Animal.Gender.FEMALE;
-        boolean isMilkSpecies = animal.getSpecies() != null && animal.getSpecies().isMilkProducer();
-
-        if (status == Animal.AnimalStatus.PREGNANT) {
-            if (gender != Animal.Gender.FEMALE) {
-                throw new BusinessException("Only female animals can be marked as PREGNANT");
-            }
-            if (!isMilkSpecies) {
-                throw new BusinessException(
-                        "Only milk-producing species (cow, goat, sheep, buffalo) can be marked as PREGNANT");
-            }
-        }
-
-        if (status == Animal.AnimalStatus.DRY) {
-            if (!isFemale) {
-                throw new BusinessException("Only female animals can be marked as DRY");
-            }
-            if (!isMilkSpecies) {
-                throw new BusinessException("Only milk-producing species can be marked as DRY");
-            }
-        }
     }
 
     private String normalizeCode(String name) {
@@ -230,12 +202,17 @@ public class AnimalService {
         response.setSpeciesCode(animal.getSpecies().getCode());
         response.setSpeciesName(animal.getSpecies().getName());
         response.setSpeciesNameBn(animal.getSpecies().getNameBn());
-        response.setStatus(animal.getStatus().name());
-        response.setGender(animal.getGender() != null ? animal.getGender().name() : null);
+        response.setLifecycleStatus(animal.getLifecycleStatus());
+        response.setGender(animal.getGender());
         response.setDateOfBirth(animal.getDateOfBirth());
         response.setCreatedAt(animal.getCreatedAt());
         response.setMilkProducer(animal.isMilkProducer());
-        response.setEggProducer(animal.isEggProducer());
+
+        // Derived flags — computed in Phase 6.4.B
+        response.setCurrentlyPregnant(false);   // placeholder, will compute
+        response.setCurrentlySick(false);
+        response.setCurrentlyMilking(false);
+
         return response;
     }
 }

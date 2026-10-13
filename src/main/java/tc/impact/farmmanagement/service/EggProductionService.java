@@ -189,8 +189,10 @@ public class EggProductionService {
         if (animal.getGender() != Animal.Gender.FEMALE) {
             throw new BusinessException("Only female animals lay eggs");
         }
-        if (animal.getStatus() == Animal.AnimalStatus.DEAD || animal.getStatus() == Animal.AnimalStatus.SOLD) {
-            throw new BusinessException("Cannot record eggs for animal with status " + animal.getStatus());
+        if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD
+                || animal.getLifecycleStatus() == Animal.LifecycleStatus.SOLD
+                || animal.getLifecycleStatus() == Animal.LifecycleStatus.CULLED) {
+            throw new BusinessException("Cannot record eggs for animal with status " + animal.getLifecycleStatus());
         }
     }
 
