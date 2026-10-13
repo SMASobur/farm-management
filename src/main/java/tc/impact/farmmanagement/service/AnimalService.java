@@ -11,12 +11,10 @@ import tc.impact.farmmanagement.entity.Species;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.AnimalRepository;
-import tc.impact.farmmanagement.repository.MilkProductionRepository;
-import tc.impact.farmmanagement.repository.ProductionEventRepository;
 import tc.impact.farmmanagement.repository.SpeciesRepository;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,8 +23,7 @@ public class AnimalService {
 
     private final AnimalRepository animalRepository;
     private final SpeciesRepository speciesRepository;
-    private final ProductionEventRepository eventRepository;
-    private final MilkProductionRepository milkRepository;
+    private final AnimalDerivationService derivationService;
     private final FarmContext farmContext;
 
     // ============ Create ============
@@ -52,7 +49,9 @@ public class AnimalService {
         animal.setGender(request.getGender());
         animal.setDateOfBirth(request.getDateOfBirth());
 
-        return toResponse(animalRepository.save(animal));
+        // Newly created animal — no events yet, so flags are all false
+        return toResponse(animalRepository.save(animal),
+                AnimalDerivationService.DerivedFlags.none());
     }
 
     // ============ Read ============
@@ -60,28 +59,54 @@ public class AnimalService {
     @Transactional(readOnly = true)
     public List<AnimalResponse> getAllAnimals() {
         Long farmId = farmContext.getCurrentFarmId();
-        return animalRepository.findByFarmId(farmId).stream()
-                .map(this::toResponse).collect(Collectors.toList());
+        List<Animal> animals = animalRepository.findByFarmId(farmId);
+
+        Map<Long, AnimalDerivationService.DerivedFlags> flags =
+                derivationService.computeFlagsForFarm(farmId);
+
+        return animals.stream()
+                .map(a -> toResponse(a, flags.getOrDefault(a.getId(),
+                        AnimalDerivationService.DerivedFlags.none())))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<AnimalResponse> getAnimalsBySpecies(Long speciesId) {
         Long farmId = farmContext.getCurrentFarmId();
-        return animalRepository.findByFarmIdAndSpeciesId(farmId, speciesId).stream()
-                .map(this::toResponse).collect(Collectors.toList());
+        List<Animal> animals = animalRepository.findByFarmIdAndSpeciesId(farmId, speciesId);
+
+        Map<Long, AnimalDerivationService.DerivedFlags> flags =
+                derivationService.computeFlagsForFarm(farmId);
+
+        return animals.stream()
+                .map(a -> toResponse(a, flags.getOrDefault(a.getId(),
+                        AnimalDerivationService.DerivedFlags.none())))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<AnimalResponse> getAnimalsBySpeciesAndStatus(
             Long speciesId, Animal.LifecycleStatus status) {
         Long farmId = farmContext.getCurrentFarmId();
-        return animalRepository.findByFarmIdAndSpeciesIdAndLifecycleStatus(farmId, speciesId, status).stream()
-                .map(this::toResponse).collect(Collectors.toList());
+        List<Animal> animals = animalRepository
+                .findByFarmIdAndSpeciesIdAndLifecycleStatus(farmId, speciesId, status);
+
+        Map<Long, AnimalDerivationService.DerivedFlags> flags =
+                derivationService.computeFlagsForFarm(farmId);
+
+        return animals.stream()
+                .map(a -> toResponse(a, flags.getOrDefault(a.getId(),
+                        AnimalDerivationService.DerivedFlags.none())))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public AnimalResponse getAnimalById(Long id) {
-        return toResponse(findOrThrow(id));
+        Long farmId = farmContext.getCurrentFarmId();
+        Animal animal = findOrThrow(id);
+        AnimalDerivationService.DerivedFlags flags =
+                derivationService.computeFlagsForAnimal(farmId, animal.getId());
+        return toResponse(animal, flags);
     }
 
     // ============ Update ============
@@ -107,7 +132,13 @@ public class AnimalService {
         animal.setGender(request.getGender());
         animal.setDateOfBirth(request.getDateOfBirth());
 
-        return toResponse(animalRepository.save(animal));
+        Animal saved = animalRepository.save(animal);
+
+        // Compute flags after save so response reflects current state
+        AnimalDerivationService.DerivedFlags flags =
+                derivationService.computeFlagsForAnimal(farmId, saved.getId());
+
+        return toResponse(saved, flags);
     }
 
     // ============ Delete ============
@@ -193,7 +224,7 @@ public class AnimalService {
                 .replaceAll("^_+|_+$", "");
     }
 
-    private AnimalResponse toResponse(Animal animal) {
+    private AnimalResponse toResponse(Animal animal, AnimalDerivationService.DerivedFlags flags) {
         AnimalResponse response = new AnimalResponse();
         response.setId(animal.getId());
         response.setTagNumber(animal.getTagNumber());
@@ -207,11 +238,11 @@ public class AnimalService {
         response.setDateOfBirth(animal.getDateOfBirth());
         response.setCreatedAt(animal.getCreatedAt());
         response.setMilkProducer(animal.isMilkProducer());
+        response.setEggProducer(animal.getSpecies().isEggProducer());
 
-        // Derived flags — computed in Phase 6.4.B
-        response.setCurrentlyPregnant(false);   // placeholder, will compute
-        response.setCurrentlySick(false);
-        response.setCurrentlyMilking(false);
+        response.setCurrentlyPregnant(flags.pregnant);
+        response.setCurrentlySick(flags.sick);
+        response.setCurrentlyMilking(flags.milking);
 
         return response;
     }
