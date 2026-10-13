@@ -182,17 +182,18 @@ public class EggProductionService {
     }
 
     private void validateAnimalLaysEggs(Animal animal) {
+        if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD
+                || animal.getLifecycleStatus() == Animal.LifecycleStatus.SOLD
+                || animal.getLifecycleStatus() == Animal.LifecycleStatus.CULLED) {
+            throw new BusinessException(
+                    "Cannot record eggs for animal with status " + animal.getLifecycleStatus());
+        }
         if (animal.getSpecies() == null || !animal.getSpecies().isEggProducer()) {
             String speciesName = animal.getSpecies() != null ? animal.getSpecies().getName() : "unknown";
             throw new BusinessException("Species '" + speciesName + "' does not produce eggs");
         }
         if (animal.getGender() != Animal.Gender.FEMALE) {
             throw new BusinessException("Only female animals lay eggs");
-        }
-        if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD
-                || animal.getLifecycleStatus() == Animal.LifecycleStatus.SOLD
-                || animal.getLifecycleStatus() == Animal.LifecycleStatus.CULLED) {
-            throw new BusinessException("Cannot record eggs for animal with status " + animal.getLifecycleStatus());
         }
     }
 

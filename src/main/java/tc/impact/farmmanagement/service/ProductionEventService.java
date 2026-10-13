@@ -12,6 +12,8 @@ import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.AnimalRepository;
 import tc.impact.farmmanagement.repository.ProductionEventRepository;
 import tc.impact.farmmanagement.util.UserDisplayUtil;
+import tc.impact.farmmanagement.exception.BusinessException;
+import tc.impact.farmmanagement.repository.AnimalRepository;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,6 +34,9 @@ public class ProductionEventService {
         Farm farm = farmContext.getCurrentFarm();
         Animal animal = loadAnimal(request.getAnimalId(), farm.getId());
 
+        validateEventForAnimal(request.getEventType(), animal);
+        validateEventHistory(request.getEventType(), animal, farm.getId());
+
         ProductionEvent event = new ProductionEvent();
         event.setFarm(farm);
         event.setAnimal(animal);
@@ -44,9 +49,13 @@ public class ProductionEventService {
         event.setCost(request.getCost());
         event.setEnteredBy(farmContext.getCurrentUser());
 
-        return toResponse(eventRepository.save(event));
-    }
+        ProductionEvent saved = eventRepository.save(event);
 
+        // Handle lifecycle transitions
+        applyLifecycleTransition(request.getEventType(), animal);
+
+        return toResponse(saved);
+    }
     // ============ Read ============
 
     @Transactional(readOnly = true)
@@ -82,11 +91,16 @@ public class ProductionEventService {
         Long farmId = farmContext.getCurrentFarmId();
         ProductionEvent event = findOrThrow(id);
 
-        // Animal cannot be changed once created
         if (!event.getAnimal().getId().equals(request.getAnimalId())) {
-            throw new tc.impact.farmmanagement.exception.BusinessException(
+            throw new BusinessException(
                     "Animal cannot be changed on an existing event. Delete and recreate.");
         }
+
+        Animal animal = event.getAnimal();
+
+        // Re-validate: the event type may have changed
+        validateEventForAnimal(request.getEventType(), animal);
+        validateEventHistory(request.getEventType(), animal, farmId, id);   // exclude self
 
         event.setDate(request.getDate() != null ? request.getDate() : event.getDate());
         event.setEventType(request.getEventType());
@@ -146,5 +160,94 @@ public class ProductionEventService {
             response.setEnteredByName(UserDisplayUtil.displayName(e.getEnteredBy()));
         }
         return response;
+    }
+
+    private void validateEventForAnimal(ProductionEvent.EventType type, Animal animal) {
+        switch (type) {
+            case PREGNANCY, CALVING -> {
+                if (animal.getGender() != Animal.Gender.FEMALE) {
+                    throw new BusinessException(
+                            "Only female animals can have " + type + " events");
+                }
+                boolean isMilkSpecies = animal.getSpecies() != null
+                        && animal.getSpecies().isMilkProducer();
+                if (!isMilkSpecies) {
+                    String speciesName = animal.getSpecies() != null
+                            ? animal.getSpecies().getName()
+                            : "unknown";
+                    throw new BusinessException(
+                            "Only milk-producing species can have " + type +
+                                    " events. Species '" + speciesName + "' cannot.");
+                }
+            }
+            case ILLNESS, TREATMENT, VACCINATION, DEWORMING, CHECKUP, WEIGHT -> {
+                // Require the animal to be ACTIVE
+                if (animal.getLifecycleStatus() != Animal.LifecycleStatus.ACTIVE) {
+                    throw new BusinessException(
+                            "Cannot record " + type + " for animal with status " +
+                                    animal.getLifecycleStatus());
+                }
+            }
+            case SALE -> {
+                if (animal.getLifecycleStatus() == Animal.LifecycleStatus.SOLD) {
+                    throw new BusinessException(
+                            "Animal '" + animal.getTagNumber() + "' is already SOLD");
+                }
+                if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD) {
+                    throw new BusinessException(
+                            "Cannot record SALE for a DEAD animal");
+                }
+            }
+            case DEATH -> {
+                if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD) {
+                    throw new BusinessException(
+                            "Animal '" + animal.getTagNumber() + "' is already marked DEAD");
+                }
+                if (animal.getLifecycleStatus() == Animal.LifecycleStatus.SOLD) {
+                    throw new BusinessException(
+                            "Cannot record DEATH for a SOLD animal");
+                }
+            }
+            // NOTE, OTHER, PURCHASE have no species/gender restrictions
+            default -> { }
+        }
+    }
+
+    private void validateEventHistory(ProductionEvent.EventType type, Animal animal,
+                                      Long farmId, Long... excludeEventId) {
+        Long exclude = excludeEventId.length > 0 ? excludeEventId[0] : null;
+
+        switch (type) {
+            case PURCHASE -> {
+                // Only allow ONE purchase event per animal
+                List<ProductionEvent> purchases = eventRepository
+                        .findByFarmIdAndAnimalIdAndEventTypeOrderByDateDesc(
+                                farmId, animal.getId(), ProductionEvent.EventType.PURCHASE);
+                boolean hasOtherPurchase = purchases.stream()
+                        .anyMatch(p -> exclude == null || !p.getId().equals(exclude));
+                if (hasOtherPurchase) {
+                    throw new BusinessException(
+                            "Animal '" + animal.getTagNumber() +
+                                    "' already has a PURCHASE event recorded");
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private void applyLifecycleTransition(ProductionEvent.EventType type, Animal animal) {
+        boolean changed = false;
+
+        if (type == ProductionEvent.EventType.SALE) {
+            animal.setLifecycleStatus(Animal.LifecycleStatus.SOLD);
+            changed = true;
+        } else if (type == ProductionEvent.EventType.DEATH) {
+            animal.setLifecycleStatus(Animal.LifecycleStatus.DEAD);
+            changed = true;
+        }
+
+        if (changed) {
+            animalRepository.save(animal);
+        }
     }
 }

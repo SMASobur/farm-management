@@ -70,17 +70,18 @@ public class ProductionEvent {
     }
 
     public enum EventType {
-        ILLNESS,         // sickness onset
-        TREATMENT,       // medicine administered
-        VACCINATION,     // vaccine given
-        DEWORMING,       // dewormer administered
-        CHECKUP,         // routine vet visit
-        PREGNANCY,       // confirmed pregnant
-        CALVING,         // gave birth
-        WEIGHT,          // weighed — title contains the value
-        PURCHASE,        // animal bought
-        SALE,            // animal sold
-        NOTE,            // general note
+        ILLNESS,
+        TREATMENT,
+        VACCINATION,
+        DEWORMING,
+        CHECKUP,
+        PREGNANCY,
+        CALVING,
+        WEIGHT,
+        PURCHASE,
+        SALE,
+        DEATH,
+        NOTE,
         OTHER
     }
 }
