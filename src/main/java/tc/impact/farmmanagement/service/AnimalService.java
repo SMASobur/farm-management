@@ -3,6 +3,7 @@ package tc.impact.farmmanagement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tc.impact.farmmanagement.dto.request.AnimalFilter;
 import tc.impact.farmmanagement.dto.request.AnimalRequest;
 import tc.impact.farmmanagement.dto.response.AnimalResponse;
 import tc.impact.farmmanagement.entity.Animal;
@@ -57,6 +58,60 @@ public class AnimalService {
     // ============ Read ============
 
     @Transactional(readOnly = true)
+    public List<AnimalResponse> getFiltered(AnimalFilter filter) {
+        Long farmId = farmContext.getCurrentFarmId();
+
+        // 1. Load candidate animals (SQL filters: species, lifecycle)
+        List<Animal> animals;
+        if (filter.getSpeciesId() != null && filter.getStatus() != null) {
+            animals = animalRepository.findByFarmIdAndSpeciesIdAndLifecycleStatus(
+                    farmId, filter.getSpeciesId(), filter.getStatus());
+        } else if (filter.getSpeciesId() != null) {
+            animals = animalRepository.findByFarmIdAndSpeciesId(farmId, filter.getSpeciesId());
+        } else if (filter.getStatus() != null) {
+            animals = animalRepository.findByFarmIdAndLifecycleStatus(farmId, filter.getStatus());
+        } else {
+            animals = animalRepository.findByFarmId(farmId);
+        }
+
+        // 2. Compute derived flags for all candidates (batch)
+        Map<Long, AnimalDerivationService.DerivedFlags> flags =
+                derivationService.computeFlagsForFarm(farmId);
+
+        // 3. Map to responses
+        List<AnimalResponse> responses = animals.stream()
+                .map(a -> toResponse(a, flags.getOrDefault(a.getId(),
+                        AnimalDerivationService.DerivedFlags.none())))
+                .collect(Collectors.toList());
+
+        // 4. Apply derived-condition filter (in memory)
+        if (filter.getCondition() != null) {
+            responses = responses.stream()
+                    .filter(r -> matchesCondition(r, filter.getCondition()))
+                    .collect(Collectors.toList());
+        }
+
+        // 5. Apply search filter (in memory)
+        if (filter.getSearch() != null && !filter.getSearch().isBlank()) {
+            String q = filter.getSearch().trim().toLowerCase();
+            responses = responses.stream()
+                    .filter(r -> (r.getTagNumber() != null && r.getTagNumber().toLowerCase().contains(q))
+                            || (r.getName() != null && r.getName().toLowerCase().contains(q)))
+                    .collect(Collectors.toList());
+        }
+
+        return responses;
+    }
+
+    private boolean matchesCondition(AnimalResponse r, AnimalFilter.AnimalCondition condition) {
+        return switch (condition) {
+            case PREGNANT -> r.isCurrentlyPregnant();
+            case SICK     -> r.isCurrentlySick();
+            case MILKING  -> r.isCurrentlyMilking();
+        };
+    }
+
+    @Transactional(readOnly = true)
     public List<AnimalResponse> getAllAnimals() {
         Long farmId = farmContext.getCurrentFarmId();
         List<Animal> animals = animalRepository.findByFarmId(farmId);
@@ -78,6 +133,18 @@ public class AnimalService {
         Map<Long, AnimalDerivationService.DerivedFlags> flags =
                 derivationService.computeFlagsForFarm(farmId);
 
+        return animals.stream()
+                .map(a -> toResponse(a, flags.getOrDefault(a.getId(),
+                        AnimalDerivationService.DerivedFlags.none())))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AnimalResponse> getAnimalsByStatus(Animal.LifecycleStatus status) {
+        Long farmId = farmContext.getCurrentFarmId();
+        List<Animal> animals = animalRepository.findByFarmIdAndLifecycleStatus(farmId, status);
+        Map<Long, AnimalDerivationService.DerivedFlags> flags =
+                derivationService.computeFlagsForFarm(farmId);
         return animals.stream()
                 .map(a -> toResponse(a, flags.getOrDefault(a.getId(),
                         AnimalDerivationService.DerivedFlags.none())))
@@ -238,7 +305,7 @@ public class AnimalService {
         response.setDateOfBirth(animal.getDateOfBirth());
         response.setCreatedAt(animal.getCreatedAt());
         response.setMilkProducer(animal.isMilkProducer());
-        response.setEggProducer(animal.getSpecies().isEggProducer());
+        response.setEggProducer(animal.isEggProducer());
 
         response.setCurrentlyPregnant(flags.pregnant);
         response.setCurrentlySick(flags.sick);

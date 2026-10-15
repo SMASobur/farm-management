@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import tc.impact.farmmanagement.dto.request.AnimalFilter;
 import tc.impact.farmmanagement.dto.request.AnimalRequest;
 import tc.impact.farmmanagement.dto.response.AnimalResponse;
 import tc.impact.farmmanagement.dto.response.ApiResponse;
@@ -30,17 +31,17 @@ public class AnimalController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<AnimalResponse>>> getAllAnimals(
             @RequestParam(required = false) Long speciesId,
-            @RequestParam(required = false) Animal.LifecycleStatus status) {
+            @RequestParam(required = false) Animal.LifecycleStatus status,
+            @RequestParam(required = false) AnimalFilter.AnimalCondition condition,
+            @RequestParam(required = false) String search) {
 
-        List<AnimalResponse> animals;
-        if (speciesId != null && status != null) {
-            animals = animalService.getAnimalsBySpeciesAndStatus(speciesId, status);
-        } else if (speciesId != null) {
-            animals = animalService.getAnimalsBySpecies(speciesId);
-        } else {
-            animals = animalService.getAllAnimals();
-        }
-        return ResponseEntity.ok(ApiResponse.success(animals));
+        AnimalFilter filter = new AnimalFilter();
+        filter.setSpeciesId(speciesId);
+        filter.setStatus(status);
+        filter.setCondition(condition);
+        filter.setSearch(search);
+
+        return ResponseEntity.ok(ApiResponse.success(animalService.getFiltered(filter)));
     }
 
     @GetMapping("/{id}")

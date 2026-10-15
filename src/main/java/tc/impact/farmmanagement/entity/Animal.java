@@ -33,7 +33,7 @@ public class Animal {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "species_id", nullable = false)
     private Species species;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(name = "lifecycle_status", nullable = false, length = 20)
     private LifecycleStatus lifecycleStatus;
@@ -64,6 +64,11 @@ public class Animal {
 
     public enum Gender {
         MALE, FEMALE, UNKNOWN
+    }
+
+    public boolean isEggProducer() {
+        boolean isEggSpecies = species != null && species.isEggProducer();
+        return isEggSpecies && gender == Gender.FEMALE;
     }
 
     public boolean isMilkProducer() {
