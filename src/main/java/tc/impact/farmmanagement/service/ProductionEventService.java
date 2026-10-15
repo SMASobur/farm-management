@@ -13,7 +13,6 @@ import tc.impact.farmmanagement.repository.AnimalRepository;
 import tc.impact.farmmanagement.repository.ProductionEventRepository;
 import tc.impact.farmmanagement.util.UserDisplayUtil;
 import tc.impact.farmmanagement.exception.BusinessException;
-import tc.impact.farmmanagement.repository.AnimalRepository;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -42,7 +41,11 @@ public class ProductionEventService {
         event.setAnimal(animal);
         event.setDate(request.getDate() != null ? request.getDate() : LocalDate.now());
         event.setEventType(request.getEventType());
-        event.setTitle(request.getTitle().trim());
+        String title = request.getTitle() != null && !request.getTitle().isBlank()
+                ? request.getTitle().trim()
+                : defaultTitleFor(request.getEventType());
+
+        event.setTitle(title);
         event.setDescription(request.getDescription() != null
                 ? request.getDescription().trim()
                 : null);
@@ -104,7 +107,11 @@ public class ProductionEventService {
 
         event.setDate(request.getDate() != null ? request.getDate() : event.getDate());
         event.setEventType(request.getEventType());
-        event.setTitle(request.getTitle().trim());
+        String title = request.getTitle() != null && !request.getTitle().isBlank()
+                ? request.getTitle().trim()
+                : defaultTitleFor(request.getEventType());
+
+        event.setTitle(title);
         event.setDescription(request.getDescription() != null
                 ? request.getDescription().trim()
                 : null);
@@ -161,6 +168,24 @@ public class ProductionEventService {
         }
         return response;
     }
+    private String defaultTitleFor(ProductionEvent.EventType type) {
+        return switch (type) {
+            case ILLNESS -> "Illness";
+            case TREATMENT -> "Treatment given";
+            case RECOVERY -> "Recovered";
+            case VACCINATION -> "Vaccination";
+            case DEWORMING -> "Deworming";
+            case CHECKUP -> "Checkup";
+            case PREGNANCY -> "Pregnancy confirmed";
+            case CALVING -> "Gave birth";
+            case WEIGHT -> "Weight recorded";
+            case PURCHASE -> "Purchased";
+            case SALE -> "Sold";
+            case DEATH -> "Death";
+            case NOTE -> "Note";
+            case OTHER -> "Event";
+        };
+    }
 
     private void validateEventForAnimal(ProductionEvent.EventType type, Animal animal) {
         switch (type) {
@@ -180,12 +205,10 @@ public class ProductionEventService {
                                     " events. Species '" + speciesName + "' cannot.");
                 }
             }
-            case ILLNESS, TREATMENT, VACCINATION, DEWORMING, CHECKUP, WEIGHT -> {
-                // Require the animal to be ACTIVE
+            case ILLNESS, TREATMENT, RECOVERY, VACCINATION, DEWORMING, CHECKUP, WEIGHT -> {
                 if (animal.getLifecycleStatus() != Animal.LifecycleStatus.ACTIVE) {
                     throw new BusinessException(
-                            "Cannot record " + type + " for animal with status " +
-                                    animal.getLifecycleStatus());
+                            "Cannot record " + type + " for animal with status " + animal.getLifecycleStatus());
                 }
             }
             case SALE -> {

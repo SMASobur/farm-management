@@ -21,7 +21,6 @@ public class ProductionEventRequest {
     @NotNull(message = "Event type is required")
     private ProductionEvent.EventType eventType;
 
-    @NotBlank(message = "Title is required")
     @Size(max = 200)
     private String title;
 

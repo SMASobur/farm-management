@@ -72,6 +72,7 @@ public class ProductionEvent {
     public enum EventType {
         ILLNESS,
         TREATMENT,
+        RECOVERY,
         VACCINATION,
         DEWORMING,
         CHECKUP,

@@ -13,18 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Derives temporary condition flags for animals from their event history.
- *
- * The flags are:
- *   - currentlyPregnant: latest PREGNANCY event exists, no later CALVING event
- *   - currentlySick:     latest ILLNESS event exists, no later TREATMENT event
- *   - currentlyMilking:  has at least one MilkProduction record in last 7 days
- *
- * Batch approach: computes the flags for ALL animals in a farm with
- * 5 queries total (2 for pregnant, 2 for sick, 1 for milking), independent
- * of animal count. Avoids N+1 problems.
- */
 @Service
 @RequiredArgsConstructor
 public class AnimalDerivationService {
@@ -50,10 +38,10 @@ public class AnimalDerivationService {
         }
     }
 
-    /**
-     * Compute derived flags for all animals in a farm.
-     * Returns Map<animalId, DerivedFlags>.
-     */
+    // ============================================================
+    // Batch version — for getAllAnimals()
+    // ============================================================
+
     public Map<Long, DerivedFlags> computeFlagsForFarm(Long farmId) {
         // --- Pregnant ---
         Map<Long, LocalDate> lastPregnant = toDateMap(
@@ -65,8 +53,7 @@ public class AnimalDerivationService {
         for (Map.Entry<Long, LocalDate> e : lastPregnant.entrySet()) {
             LocalDate pregnantDate = e.getValue();
             LocalDate calvingDate = lastCalving.get(e.getKey());
-            if (calvingDate == null || pregnantDate.isAfter(calvingDate)
-                    || pregnantDate.isEqual(calvingDate)) {
+            if (calvingDate == null || pregnantDate.isAfter(calvingDate)) {
                 pregnantSet.add(e.getKey());
             }
         }
@@ -74,15 +61,14 @@ public class AnimalDerivationService {
         // --- Sick ---
         Map<Long, LocalDate> lastIllness = toDateMap(
                 eventRepository.findLatestDatesByEventType(farmId, ProductionEvent.EventType.ILLNESS));
-        Map<Long, LocalDate> lastTreatment = toDateMap(
-                eventRepository.findLatestDatesByEventType(farmId, ProductionEvent.EventType.TREATMENT));
+        Map<Long, LocalDate> lastRecovery = toDateMap(
+                eventRepository.findLatestDatesByEventType(farmId, ProductionEvent.EventType.RECOVERY));
 
         Set<Long> sickSet = new HashSet<>();
         for (Map.Entry<Long, LocalDate> e : lastIllness.entrySet()) {
             LocalDate illnessDate = e.getValue();
-            LocalDate treatmentDate = lastTreatment.get(e.getKey());
-            if (treatmentDate == null || illnessDate.isAfter(treatmentDate)
-                    || illnessDate.isEqual(treatmentDate)) {
+            LocalDate recoveryDate = lastRecovery.get(e.getKey());
+            if (recoveryDate == null || illnessDate.isAfter(recoveryDate)) {
                 sickSet.add(e.getKey());
             }
         }
@@ -96,7 +82,7 @@ public class AnimalDerivationService {
         allAnimalIds.addAll(lastPregnant.keySet());
         allAnimalIds.addAll(lastCalving.keySet());
         allAnimalIds.addAll(lastIllness.keySet());
-        allAnimalIds.addAll(lastTreatment.keySet());
+        allAnimalIds.addAll(lastRecovery.keySet());   // ← was lastTreatment
         allAnimalIds.addAll(milkingSet);
 
         Map<Long, DerivedFlags> result = new HashMap<>();
@@ -109,15 +95,20 @@ public class AnimalDerivationService {
         return result;
     }
 
-    /**
-     * Compute derived flags for a single animal.
-     * This is used by getAnimalById() when we only need one.
-     */
+    // ============================================================
+    // Single-animal version — for getAnimalById()
+    // ============================================================
+
     public DerivedFlags computeFlagsForAnimal(Long farmId, Long animalId) {
         boolean pregnant = computeFlag(
-                farmId, animalId, ProductionEvent.EventType.PREGNANCY, ProductionEvent.EventType.CALVING);
+                farmId, animalId,
+                ProductionEvent.EventType.PREGNANCY,
+                ProductionEvent.EventType.CALVING);
+
         boolean sick = computeFlag(
-                farmId, animalId, ProductionEvent.EventType.ILLNESS, ProductionEvent.EventType.TREATMENT);
+                farmId, animalId,
+                ProductionEvent.EventType.ILLNESS,
+                ProductionEvent.EventType.RECOVERY);
 
         LocalDate since = LocalDate.now().minusDays(MILKING_WINDOW_DAYS);
         boolean milking = !milkRepository.findByFarmIdAndAnimalId(farmId, animalId).stream()
@@ -136,7 +127,7 @@ public class AnimalDerivationService {
         LocalDate negativeDate = getLatestDate(farmId, animalId, negativeType);
         if (negativeDate == null) return true;
 
-        return positiveDate.isAfter(negativeDate) || positiveDate.isEqual(negativeDate);
+        return positiveDate.isAfter(negativeDate);
     }
 
     private LocalDate getLatestDate(Long farmId, Long animalId, ProductionEvent.EventType type) {
