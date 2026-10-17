@@ -54,4 +54,18 @@ public interface MilkProductionRepository extends JpaRepository<MilkProduction, 
     List<Long> findAnimalIdsWithMilkSince(
             @Param("farmId") Long farmId,
             @Param("since") LocalDate since);
+
+
+    @Query("SELECT COALESCE(SUM(m.totalLiters), 0.0) FROM MilkProduction m " +
+            "WHERE m.animal.id = :animalId AND m.date = :date")
+    Double sumLitersByAnimalAndDate(@Param("animalId") Long animalId, @Param("date") LocalDate date);
+
+    @Query("SELECT COALESCE(SUM(m.totalLiters), 0.0) FROM MilkProduction m " +
+            "WHERE m.animal.id = :animalId AND m.date BETWEEN :from AND :to")
+    Double sumLitersByAnimalBetween(@Param("animalId") Long animalId,
+                                    @Param("from") LocalDate from,
+                                    @Param("to") LocalDate to);
+
+    List<MilkProduction> findByAnimalIdAndDateBetweenOrderByDateAsc(
+            Long animalId, LocalDate from, LocalDate to);
 }
