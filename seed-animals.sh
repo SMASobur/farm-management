@@ -82,3 +82,12 @@ echo "======================================="
 echo "✅ Created: $SUCCESS"
 echo "❌ Failed:  $FAIL"
 echo "======================================="
+
+
+#cd "/Users/smasobur/Learning /Farm/farm-management"
+
+# #Make executable
+#chmod +x seed-animals.sh
+
+# #Run
+# ./seed-animals.sh
