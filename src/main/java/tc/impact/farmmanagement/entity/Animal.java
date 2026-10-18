@@ -67,13 +67,18 @@ public class Animal {
     }
 
     public boolean isEggProducer() {
-        boolean isEggSpecies = species != null && species.isEggProducer();
-        return isEggSpecies && gender == Gender.FEMALE;
+        return species != null
+                && species.isEggProducer()
+                && lifecycleStatus == LifecycleStatus.ACTIVE;
     }
+
+
 
     public boolean isMilkProducer() {
         boolean isMilkSpecies = species != null && species.isMilkProducer();
-        return isMilkSpecies && gender == Gender.FEMALE;
+        return isMilkSpecies
+                && gender == Gender.FEMALE
+                && lifecycleStatus == LifecycleStatus.ACTIVE;
     }
 
     public boolean isActive() {

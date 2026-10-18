@@ -32,16 +32,15 @@ public class SpeciesSeeder implements CommandLineRunner {
     private void seedDefaults(Farm farm) {
         // code, name, nameBn, milkProducer, displayOrder
         List<Species> defaults = List.of(
-                sp("COW",     "Cow",     "গরু",     true,  false, 10),
-                sp("GOAT",    "Goat",    "ছাগল",    true,  false, 20),
-                sp("SHEEP",   "Sheep",   "ভেড়া",    true,  false, 30),
-                sp("BUFFALO", "Buffalo", "মহিষ",    true,  false, 40),
-                sp("CHICKEN", "Chicken", "মুরগি",   false, true,  50),
-                sp("DUCK",    "Duck",    "হাঁস",     false, true,  60),
-                sp("GOOSE",   "Goose",   "রাজহাঁস",  false, true,  70),
+                sp("COW",     "Cow",     "গরু",   true,  false, 10),
+                sp("GOAT",    "Goat",    "ছাগল",  true,  false, 20),
+                sp("SHEEP",   "Sheep",   "ভেড়া",  true,  false, 30),
+                sp("BUFFALO", "Buffalo", "মহিষ",  true,  false, 40),
+                sp("CHICKEN", "Chicken", "মুরগি", false, true,  50),
+                sp("DUCK",    "Duck",    "হাঁস",   false, true,  60),
+                sp("GOOSE",   "Goose",   "রাজহাঁস", false, true,  70),
                 sp("OTHER",   "Other",   "অন্যান্য", false, false, 999)
         );
-
 
         for (Species template : defaults) {
             template.setFarm(farm);

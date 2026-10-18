@@ -273,11 +273,9 @@ public class AnimalService {
         sp.setFarm(farm);
         sp.setCode(code);
         sp.setName(name);
-        sp.setNameBn(request.getCustomSpeciesNameBn() != null
-                ? request.getCustomSpeciesNameBn().trim()
-                : null);
-        sp.setMilkProducer(false);
-        sp.setEggProducer(false);
+        sp.setNameBn(request.getCustomSpeciesNameBn());
+        sp.setMilkProducer(Boolean.TRUE.equals(request.getCustomSpeciesMilkProducer()));
+        sp.setEggProducer(Boolean.TRUE.equals(request.getCustomSpeciesEggProducer()));
         sp.setActive(saveForReuse);
         sp.setSystemDefault(false);
         sp.setDisplayOrder(900);
