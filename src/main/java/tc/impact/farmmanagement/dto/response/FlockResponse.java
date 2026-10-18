@@ -10,7 +10,12 @@ public class FlockResponse {
     private Long id;
     private String flockCode;
     private String name;
-    private Flock.Species species;
+
+    private Long speciesId;
+    private String speciesCode;
+    private String speciesName;
+    private String speciesNameBn;
+
     private Integer birdCount;
     private Flock.FlockStatus status;
     private LocalDate startedOn;

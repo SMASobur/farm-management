@@ -30,15 +30,15 @@ public class Flock {
 
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Species species;    // CHICKEN, DUCK, etc.
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "species_id", nullable = false)
+    private Species species;
 
     @Column(name = "bird_count", nullable = false)
     private Integer birdCount;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private FlockStatus status;
 
     @Column(name = "started_on")
@@ -55,14 +55,10 @@ public class Flock {
         }
     }
 
-    public enum Species {
-        CHICKEN, DUCK, GOOSE, QUAIL, TURKEY, OTHER
-    }
-
     public enum FlockStatus {
-        ACTIVE,     // Currently producing
-        RETIRED,    // No longer producing (old hens)
-        SOLD,       // Sold off
-        DISEASED    // Under quarantine
+        ACTIVE,
+        RETIRED,
+        SOLD,
+        DISEASED
     }
 }
