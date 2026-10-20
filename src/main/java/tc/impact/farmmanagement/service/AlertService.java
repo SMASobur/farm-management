@@ -15,6 +15,9 @@ import tc.impact.farmmanagement.repository.ExpenseRepository;
 import tc.impact.farmmanagement.repository.MilkProductionRepository;
 import tc.impact.farmmanagement.repository.SaleRepository;
 import tc.impact.farmmanagement.repository.WorkerRepository;
+import tc.impact.farmmanagement.entity.Flock;
+import tc.impact.farmmanagement.repository.EggProductionRepository;
+import tc.impact.farmmanagement.repository.FlockRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -37,10 +40,14 @@ public class AlertService {
     private final WorkerRepository workerRepository;
     private final ExpenseRepository expenseRepository;
     private final FarmContext farmContext;
+    private final EggProductionRepository eggRepository;
+    private final FlockRepository flockRepository;
 
     private static final double LOW_MILK_THRESHOLD = 0.70;
     private static final int OVERDUE_DAYS = 30;
     private static final int SALARY_DUE_DAY_OF_MONTH = 28;
+    private static final int EGG_ALERT_MIN_BIRDS = 5;
+    private static final double EGG_ALERT_THRESHOLD = 0.70;
 
     @Transactional(readOnly = true)
     public DashboardAlertsResponse getAlerts() {
@@ -48,6 +55,7 @@ public class AlertService {
         List<DashboardAlert> alerts = new ArrayList<>();
 
         alerts.addAll(getLowMilkProductionAlerts(farmId));
+        alerts.addAll(getLowEggProductionAlerts(farmId));
         alerts.addAll(getOverduePaymentAlerts(farmId));
         alerts.addAll(getSalaryDueAlerts(farmId));
 
@@ -194,6 +202,91 @@ public class AlertService {
             alert.setLink("/workers/" + worker.getId());
             alerts.add(alert);
         }
+        return alerts;
+    }
+
+// ============================================================
+// Alert 4: Low Egg Production (Batches)
+// ============================================================
+
+    private List<DashboardAlert> getLowEggProductionAlerts(Long farmId) {
+        List<DashboardAlert> alerts = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate sevenDaysAgo = today.minusDays(7);
+
+        // --- Batch-level alerts ---
+        List<Flock> activeFlocks = flockRepository.findByFarmIdAndStatus(
+                farmId, Flock.FlockStatus.ACTIVE);
+
+        for (Flock flock : activeFlocks) {
+            if (flock.getBirdCount() < EGG_ALERT_MIN_BIRDS) continue;
+
+            Long todayTotal = eggRepository.sumTotalEggsByFlockAndDate(flock.getId(), today);
+            if (todayTotal == null || todayTotal == 0) continue;
+
+            Long weekSum = eggRepository.sumTotalEggsByFlockBetween(
+                    flock.getId(), sevenDaysAgo, yesterday);
+            if (weekSum == null || weekSum == 0) continue;
+
+            long daysWithData = eggRepository
+                    .findByFlockIdAndDateBetweenOrderByDateAsc(flock.getId(), sevenDaysAgo, yesterday)
+                    .size();
+            if (daysWithData == 0) continue;
+
+            double dailyAvg = (double) weekSum / daysWithData;
+            double ratio = (double) todayTotal / dailyAvg;
+
+            if (ratio < EGG_ALERT_THRESHOLD) {
+                DashboardAlert alert = new DashboardAlert();
+                alert.setType("LOW_EGG_PRODUCTION");
+                alert.setSeverity("WARNING");
+                alert.setTitle(flock.getFlockCode() + " — egg drop");
+                alert.setMessage(String.format(
+                        "%d eggs today vs %.0f 7-day avg (%.0f%%) across %d birds",
+                        todayTotal.intValue(), dailyAvg, ratio * 100, flock.getBirdCount()));
+                alert.setValue(BigDecimal.valueOf(ratio * 100).setScale(1, RoundingMode.HALF_UP));
+                alert.setLink("/flocks/" + flock.getId());
+                alerts.add(alert);
+            }
+        }
+
+        // --- Individual bird alerts ---
+        List<Animal> eggAnimals = animalRepository.findByFarmId(farmId).stream()
+                .filter(Animal::isEggProducer)
+                .filter(Animal::isActive)
+                .collect(Collectors.toList());
+
+        for (Animal animal : eggAnimals) {
+            Long todayTotal = eggRepository.sumTotalEggsByAnimalAndDate(animal.getId(), today);
+            if (todayTotal == null || todayTotal == 0) continue;
+
+            Long weekSum = eggRepository.sumTotalEggsByAnimalBetween(
+                    animal.getId(), sevenDaysAgo, yesterday);
+            if (weekSum == null || weekSum == 0) continue;
+
+            long daysWithData = eggRepository
+                    .findByAnimalIdAndDateBetweenOrderByDateAsc(animal.getId(), sevenDaysAgo, yesterday)
+                    .size();
+            if (daysWithData == 0) continue;
+
+            double dailyAvg = (double) weekSum / daysWithData;
+            double ratio = (double) todayTotal / dailyAvg;
+
+            if (ratio < EGG_ALERT_THRESHOLD) {
+                DashboardAlert alert = new DashboardAlert();
+                alert.setType("LOW_EGG_PRODUCTION");
+                alert.setSeverity("INFO");
+                alert.setTitle(animal.getTagNumber() + " — egg drop");
+                alert.setMessage(String.format(
+                        "%d egg(s) today vs %.0f 7-day avg (%.0f%%)",
+                        todayTotal.intValue(), dailyAvg, ratio * 100));
+                alert.setValue(BigDecimal.valueOf(ratio * 100).setScale(1, RoundingMode.HALF_UP));
+                alert.setLink("/animals/" + animal.getId());
+                alerts.add(alert);
+            }
+        }
+
         return alerts;
     }
 

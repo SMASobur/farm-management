@@ -45,4 +45,31 @@ public interface EggProductionRepository extends JpaRepository<EggProduction, Lo
             "WHERE e.farm.id = :farmId AND e.date BETWEEN :from AND :to " +
             "GROUP BY e.date ORDER BY e.date ASC")
     List<Object[]> dailyTotalsBetween(@Param("farmId") Long farmId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+
+    @Query("SELECT COALESCE(SUM(e.totalEggs), 0) FROM EggProduction e " +
+            "WHERE e.flock.id = :flockId AND e.date = :date")
+    Long sumTotalEggsByFlockAndDate(@Param("flockId") Long flockId, @Param("date") LocalDate date);
+
+    @Query("SELECT COALESCE(SUM(e.totalEggs), 0) FROM EggProduction e " +
+            "WHERE e.flock.id = :flockId AND e.date BETWEEN :from AND :to")
+    Long sumTotalEggsByFlockBetween(@Param("flockId") Long flockId,
+                                    @Param("from") LocalDate from,
+                                    @Param("to") LocalDate to);
+
+    @Query("SELECT COALESCE(SUM(e.totalEggs), 0) FROM EggProduction e " +
+            "WHERE e.animal.id = :animalId AND e.date = :date")
+    Long sumTotalEggsByAnimalAndDate(@Param("animalId") Long animalId, @Param("date") LocalDate date);
+
+    @Query("SELECT COALESCE(SUM(e.totalEggs), 0) FROM EggProduction e " +
+            "WHERE e.animal.id = :animalId AND e.date BETWEEN :from AND :to")
+    Long sumTotalEggsByAnimalBetween(@Param("animalId") Long animalId,
+                                     @Param("from") LocalDate from,
+                                     @Param("to") LocalDate to);
+
+    List<EggProduction> findByFlockIdAndDateBetweenOrderByDateAsc(
+            Long flockId, LocalDate from, LocalDate to);
+
+    List<EggProduction> findByAnimalIdAndDateBetweenOrderByDateAsc(
+            Long animalId, LocalDate from, LocalDate to);
 }
