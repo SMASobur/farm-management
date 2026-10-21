@@ -67,6 +67,13 @@ public interface EggProductionRepository extends JpaRepository<EggProduction, Lo
                                      @Param("from") LocalDate from,
                                      @Param("to") LocalDate to);
 
+    @Query("SELECT COALESCE(SUM(e.totalEggs), 0) FROM EggProduction e " +
+            "WHERE e.farm.id = :farmId AND e.poolSpecies.id = :speciesId AND e.date = :date")
+    Long sumEggsByFarmAndSpeciesAndDate(
+            @Param("farmId") Long farmId,
+            @Param("speciesId") Long speciesId,
+            @Param("date") LocalDate date);
+    
     List<EggProduction> findByFlockIdAndDateBetweenOrderByDateAsc(
             Long flockId, LocalDate from, LocalDate to);
 

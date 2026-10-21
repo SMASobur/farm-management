@@ -1,6 +1,7 @@
 package tc.impact.farmmanagement.dto.response;
 
 import lombok.Data;
+import tc.impact.farmmanagement.entity.PoolProductType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -8,37 +9,33 @@ import java.time.LocalDate;
 @Data
 public class SaleResponse {
     private Long id;
-
     private Long customerId;
     private String customerName;
     private String customerPhone;
-
     private LocalDate date;
-
     private Long categoryId;
     private String categoryCode;
     private String categoryName;
     private String categoryNameBn;
-
     private Long unitId;
     private String unitCode;
     private String unitName;
     private String unitAbbreviation;
-
     private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal totalAmount;
     private BigDecimal paidAmount;
     private BigDecimal dueAmount;
-
     private String customProductName;
+
+    // Pool info
+    private Long poolSpeciesId;
+    private String poolSpeciesCode;
+    private String poolSpeciesName;
+    private PoolProductType poolProductType;
+
     private String notes;
-
     private LocalDate createdAt;
-
     private Long enteredByUserId;
     private String enteredByName;
-
-    private Long milkProductionId;
-    private Long eggProductionId;
 }

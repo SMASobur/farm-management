@@ -27,13 +27,10 @@ public class SaleService {
     private final CustomerRepository customerRepository;
     private final CategoryRepository categoryRepository;
     private final PaymentRepository paymentRepository;
-    private final FarmContext farmContext;
     private final UnitRepository unitRepository;
-
-    private final MilkProductionService milkProductionService;
-    private final EggProductionService eggProductionService;
-    private final MilkProductionRepository milkProductionRepository;
-    private final EggProductionRepository eggProductionRepository;
+    private final SpeciesRepository speciesRepository;
+    private final PoolService poolService;
+    private final FarmContext farmContext;
 
     // ============ Create ============
 
@@ -50,7 +47,6 @@ public class SaleService {
         Category category = loadProductCategory(request.getCategoryId(), farm.getId());
         Unit unit = resolveUnit(request, farm.getId());
 
-        // Handle "Save as category" toggle
         String customProductName = null;
         if (isOtherCategory(category) && hasText(request.getCustomProductName())) {
             if (Boolean.TRUE.equals(request.getSaveCustomProductAsCategory())) {
@@ -67,67 +63,70 @@ public class SaleService {
             }
         }
 
+        // ============ Pool validation ============
+        Species poolSpecies = null;
+        PoolProductType poolProductType = null;
+
+        if ("MILK".equalsIgnoreCase(category.getCode())) {
+            if (request.getPoolSpeciesId() == null) {
+                throw new BusinessException("Please specify which milk pool (Cow Milk, Buffalo Milk, etc.)");
+            }
+            poolSpecies = loadSpecies(request.getPoolSpeciesId(), farm.getId());
+            if (!poolSpecies.isMilkProducer()) {
+                throw new BusinessException("Species '" + poolSpecies.getName() + "' does not produce milk");
+            }
+            if (!poolSpecies.isActive()) {
+                throw new BusinessException("Species '" + poolSpecies.getName() + "' is inactive");
+            }
+            poolProductType = PoolProductType.MILK;
+
+            double available = poolService.getAvailableStock(
+                    farm.getId(), poolSpecies.getId(), poolProductType, request.getDate());
+            if (request.getQuantity().doubleValue() > available) {
+                throw new BusinessException(String.format(
+                        "Cannot sell %.1fL of %s milk — only %.1fL available today",
+                        request.getQuantity().doubleValue(),
+                        poolSpecies.getName(),
+                        available));
+            }
+        } else if ("EGG".equalsIgnoreCase(category.getCode())) {
+            if (request.getPoolSpeciesId() == null) {
+                throw new BusinessException("Please specify which egg pool (Chicken, Duck, etc.)");
+            }
+            poolSpecies = loadSpecies(request.getPoolSpeciesId(), farm.getId());
+            if (!poolSpecies.isEggProducer()) {
+                throw new BusinessException("Species '" + poolSpecies.getName() + "' does not produce eggs");
+            }
+            if (!poolSpecies.isActive()) {
+                throw new BusinessException("Species '" + poolSpecies.getName() + "' is inactive");
+            }
+            poolProductType = PoolProductType.EGG;
+
+            double available = poolService.getAvailableStock(
+                    farm.getId(), poolSpecies.getId(), poolProductType, request.getDate());
+            if (request.getQuantity().doubleValue() > available) {
+                throw new BusinessException(String.format(
+                        "Cannot sell %d %s eggs — only %d available today",
+                        request.getQuantity().intValue(),
+                        poolSpecies.getName(),
+                        (int) available));
+            }
+        }
+
+        // ============ Build sale ============
         Sale sale = new Sale();
         sale.setFarm(farm);
         sale.setCustomer(customer);
         sale.setDate(request.getDate());
         sale.setCategory(category);
         sale.setUnit(unit);
+        sale.setPoolSpecies(poolSpecies);
+        sale.setPoolProductType(poolProductType);
         sale.setQuantity(request.getQuantity());
         sale.setUnitPrice(request.getUnitPrice());
         sale.setNotes(request.getNotes());
         sale.setCustomProductName(customProductName);
         sale.setEnteredBy(farmContext.getCurrentUser());
-        // Validate + link to production if applicable
-        if (request.getMilkProductionId() != null) {
-            MilkProduction production = milkProductionRepository.findById(request.getMilkProductionId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Milk production not found"));
-
-            // Verify same farm
-            if (!production.getFarm().getId().equals(farm.getId())) {
-                throw new ResourceNotFoundException("Milk production not found");
-            }
-
-            // Verify the sale category is MILK-type
-            if (!"MILK".equalsIgnoreCase(category.getCode())) {
-                throw new BusinessException(
-                        "Cannot link a " + category.getCode() + " sale to a milk production record");
-            }
-
-            // Verify quantity is available
-            double available = production.getAvailableForSale();
-            if (request.getQuantity().doubleValue() > available) {
-                throw new BusinessException(
-                        "Cannot sell " + request.getQuantity() + "L — only " + available + "L available "
-                                + "(produced " + production.getTotalLiters() + "L, sold "
-                                + production.getLitersSold() + "L)");
-            }
-
-            sale.setMilkProduction(production);
-        }
-
-        if (request.getEggProductionId() != null) {
-            EggProduction production = eggProductionRepository.findById(request.getEggProductionId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Egg production not found"));
-
-            if (!production.getFarm().getId().equals(farm.getId())) {
-                throw new ResourceNotFoundException("Egg production not found");
-            }
-
-            if (!"EGG".equalsIgnoreCase(category.getCode())) {
-                throw new BusinessException(
-                        "Cannot link a " + category.getCode() + " sale to an egg production record");
-            }
-
-            int available = production.getAvailableForSale();
-            if (request.getQuantity().intValue() > available) {
-                throw new BusinessException(
-                        "Cannot sell " + request.getQuantity() + " eggs — only " + available + " available "
-                                + "(produced " + production.getTotalEggs() + ", sold " + production.getEggsSold() + ")");
-            }
-
-            sale.setEggProduction(production);
-        }
 
         BigDecimal total = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
@@ -156,18 +155,6 @@ public class SaleService {
                     ? request.getInitialPaymentMethod() : Payment.PaymentMethod.CASH);
             payment.setNotes("Initial payment at sale creation");
             paymentRepository.save(payment);
-        }
-        // After save succeeds
-        if (sale.getMilkProduction() != null) {
-            milkProductionService.incrementLitersSold(
-                    sale.getMilkProduction().getId(),
-                    sale.getQuantity().doubleValue());
-        }
-
-        if (sale.getEggProduction() != null) {
-            eggProductionService.incrementEggsSold(
-                    sale.getEggProduction().getId(),
-                    sale.getQuantity().intValue());
         }
 
         return toResponse(saved);
@@ -265,9 +252,10 @@ public class SaleService {
         Sale sale = findOrThrow(id);
         Long farmId = farmContext.getCurrentFarmId();
 
-        if (sale.getMilkProduction() != null || sale.getEggProduction() != null) {
+        // Cannot edit sales that came from a pool — they affect inventory
+        if (sale.getPoolSpecies() != null) {
             throw new BusinessException(
-                    "Cannot edit a sale linked to a production record. Delete and recreate.");
+                    "Cannot edit a sale linked to a production pool. Delete and recreate.");
         }
 
         if (!sale.getCustomer().getId().equals(request.getCustomerId())) {
@@ -320,17 +308,6 @@ public class SaleService {
             throw new BusinessException("Cannot delete a sale with payments. Delete payments first.");
         }
 
-        if (sale.getMilkProduction() != null) {
-            milkProductionService.decrementLitersSold(
-                    sale.getMilkProduction().getId(),
-                    sale.getQuantity().doubleValue());
-        }
-        if (sale.getEggProduction() != null) {
-            eggProductionService.decrementEggsSold(
-                    sale.getEggProduction().getId(),
-                    sale.getQuantity().intValue());
-        }
-
         List<Payment> payments = paymentRepository.findByFarmIdAndSaleId(
                 farmContext.getCurrentFarmId(), id);
         if (!payments.isEmpty()) {
@@ -368,6 +345,15 @@ public class SaleService {
 
     // ============ Helpers ============
 
+    private Species loadSpecies(Long speciesId, Long farmId) {
+        Species sp = speciesRepository.findById(speciesId)
+                .orElseThrow(() -> new ResourceNotFoundException("Species not found with id: " + speciesId));
+        if (!sp.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Species not found");
+        }
+        return sp;
+    }
+
     private Unit resolveUnit(SaleRequest request, Long farmId) {
         boolean hasUnitId = request.getUnitId() != null;
         boolean hasCustomName = request.getCustomUnitName() != null
@@ -386,17 +372,11 @@ public class SaleService {
 
         String name = request.getCustomUnitName().trim();
         String code = normalizeCode(name);
-        if (code.isEmpty()) {
-            throw new BusinessException("Invalid unit name");
-        }
-        if (code.length() > 20) {
-            code = code.substring(0, 20);
-        }
+        if (code.isEmpty()) throw new BusinessException("Invalid unit name");
+        if (code.length() > 20) code = code.substring(0, 20);
 
         var existing = unitRepository.findByFarmIdAndCode(farmId, code);
-        if (existing.isPresent()) {
-            return existing.get();
-        }
+        if (existing.isPresent()) return existing.get();
 
         boolean saveForReuse = Boolean.TRUE.equals(request.getSaveCustomUnitToUnits());
 
@@ -405,45 +385,27 @@ public class SaleService {
         unit.setFarm(farm);
         unit.setCode(code);
         unit.setName(name);
-        unit.setNameBn(
-                request.getCustomUnitNameBn() != null
-                        ? request.getCustomUnitNameBn().trim()
-                        : null);
-        unit.setAbbreviation(
-                request.getCustomUnitAbbreviation() != null
-                        ? request.getCustomUnitAbbreviation().trim()
-                        : null);
+        unit.setNameBn(request.getCustomUnitNameBn() != null ? request.getCustomUnitNameBn().trim() : null);
+        unit.setAbbreviation(request.getCustomUnitAbbreviation() != null ? request.getCustomUnitAbbreviation().trim() : null);
         unit.setActive(saveForReuse);
         unit.setSystemDefault(false);
         unit.setDisplayOrder(900);
         return unitRepository.save(unit);
     }
 
-    /**
-     * Resolves the default unit to attach to a new custom category.
-     * Returns null if not provided.
-     */
     private Unit resolveDefaultUnitForCategory(SaleRequest request, Long farmId) {
-        if (request.getCustomProductDefaultUnitId() == null) {
-            return null;
-        }
+        if (request.getCustomProductDefaultUnitId() == null) return null;
         return loadUnit(request.getCustomProductDefaultUnitId(), farmId);
     }
 
     private Category findOrCreateCategoryForFarm(String name, String nameBn, Unit defaultUnit, Farm farm) {
         String code = normalizeCode(name);
-        if (code.isEmpty()) {
-            throw new BusinessException("Invalid category name");
-        }
-        if (code.length() > 50) {
-            code = code.substring(0, 50);
-        }
+        if (code.isEmpty()) throw new BusinessException("Invalid category name");
+        if (code.length() > 50) code = code.substring(0, 50);
 
         var existing = categoryRepository.findByFarmIdAndCodeAndType(
                 farm.getId(), code, Category.CategoryType.PRODUCT);
-        if (existing.isPresent()) {
-            return existing.get();
-        }
+        if (existing.isPresent()) return existing.get();
 
         Category category = new Category();
         category.setFarm(farm);
@@ -454,31 +416,23 @@ public class SaleService {
         category.setActive(true);
         category.setSystemDefault(false);
         category.setDisplayOrder(900);
-        category.setDefaultUnit(defaultUnit);   // ← attach the default unit
+        category.setDefaultUnit(defaultUnit);
         return categoryRepository.save(category);
     }
 
     private Unit loadUnit(Long unitId, Long farmId) {
         Unit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Unit not found with id: " + unitId));
-        if (!unit.getFarm().getId().equals(farmId)) {
-            throw new ResourceNotFoundException("Unit not found");
-        }
-        if (!unit.isActive()) {
-            throw new BusinessException("Unit '" + unit.getName() + "' is inactive");
-        }
+        if (!unit.getFarm().getId().equals(farmId)) throw new ResourceNotFoundException("Unit not found");
+        if (!unit.isActive()) throw new BusinessException("Unit '" + unit.getName() + "' is inactive");
         return unit;
     }
 
     private Category loadProductCategory(Long categoryId, Long farmId) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
-        if (!category.getFarm().getId().equals(farmId)) {
-            throw new ResourceNotFoundException("Category not found with id: " + categoryId);
-        }
-        if (!category.isActive()) {
-            throw new BusinessException("Category '" + category.getName() + "' is inactive");
-        }
+        if (!category.getFarm().getId().equals(farmId)) throw new ResourceNotFoundException("Category not found");
+        if (!category.isActive()) throw new BusinessException("Category '" + category.getName() + "' is inactive");
         if (category.getType() != Category.CategoryType.PRODUCT) {
             throw new BusinessException("Category '" + category.getName() + "' is not a product category");
         }
@@ -504,10 +458,7 @@ public class SaleService {
     }
 
     private String normalizeCode(String name) {
-        return name.trim()
-                .toUpperCase()
-                .replaceAll("[^\\p{L}\\p{N}]+", "_")
-                .replaceAll("^_+|_+$", "");
+        return name.trim().toUpperCase().replaceAll("[^\\p{L}\\p{N}]+", "_").replaceAll("^_+|_+$", "");
     }
 
     SaleResponse toResponse(Sale sale) {
@@ -531,17 +482,20 @@ public class SaleService {
         response.setPaidAmount(sale.getPaidAmount());
         response.setDueAmount(sale.getDueAmount());
         response.setCustomProductName(sale.getCustomProductName());
+
+        if (sale.getPoolSpecies() != null) {
+            response.setPoolSpeciesId(sale.getPoolSpecies().getId());
+            response.setPoolSpeciesCode(sale.getPoolSpecies().getCode());
+            response.setPoolSpeciesName(sale.getPoolSpecies().getName());
+        }
+        response.setPoolProductType(sale.getPoolProductType());
+
         response.setNotes(sale.getNotes());
         response.setCreatedAt(sale.getCreatedAt());
+
         if (sale.getEnteredBy() != null) {
             response.setEnteredByUserId(sale.getEnteredBy().getId());
             response.setEnteredByName(UserDisplayUtil.displayName(sale.getEnteredBy()));
-        }
-        if (sale.getMilkProduction() != null) {
-            response.setMilkProductionId(sale.getMilkProduction().getId());
-        }
-        if (sale.getEggProduction() != null) {
-            response.setEggProductionId(sale.getEggProduction().getId());
         }
         return response;
     }

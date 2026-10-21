@@ -23,13 +23,4 @@ public class MilkProductionRequest {
 
     @PositiveOrZero
     private Double nightLiters;
-
-    @PositiveOrZero
-    private Double litersInternal;
-
-    @PositiveOrZero
-    private Double litersFed;
-
-    @PositiveOrZero
-    private Double litersWasted;
 }

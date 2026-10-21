@@ -1,6 +1,7 @@
 package tc.impact.farmmanagement.dto.response;
 
 import lombok.Data;
+import tc.impact.farmmanagement.entity.PoolProductType;
 
 import java.time.LocalDate;
 
@@ -15,11 +16,13 @@ public class MilkProductionResponse {
     private Double noonLiters;
     private Double nightLiters;
     private Double totalLiters;
+
+    // Pool info
+    private Long poolSpeciesId;
+    private String poolSpeciesCode;
+    private String poolSpeciesName;
+    private PoolProductType poolProductType;
+
     private Long enteredByUserId;
     private String enteredByName;
-    private Double litersSold;
-    private Double litersInternal;
-    private Double litersFed;
-    private Double litersWasted;
-    private Double availableForSale;
 }

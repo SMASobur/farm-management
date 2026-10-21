@@ -10,6 +10,7 @@ import tc.impact.farmmanagement.entity.Animal;
 import tc.impact.farmmanagement.entity.EggProduction;
 import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.entity.Flock;
+import tc.impact.farmmanagement.entity.PoolProductType;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.AnimalRepository;
@@ -30,6 +31,8 @@ public class EggProductionService {
     private final FlockRepository flockRepository;
     private final FarmContext farmContext;
 
+    // ============ Create ============
+
     @Transactional
     public EggProductionResponse create(EggProductionRequest request) {
         Farm farm = farmContext.getCurrentFarm();
@@ -41,17 +44,7 @@ public class EggProductionService {
         production.setGoodEggs(safe(request.getGoodEggs()));
         production.setCrackedEggs(safe(request.getCrackedEggs()));
         production.setEnteredBy(farmContext.getCurrentUser());
-        production.setEggsInternal(safe(request.getEggsInternal()));
-        production.setEggsWasted(safe(request.getEggsWasted()));
-        production.setEggsFed(safe(request.getEggsFed()));
-
-        int usage = safe(request.getEggsInternal())
-                + safe(request.getEggsWasted())
-                + safe(request.getEggsFed());
-        if (usage > production.getTotalEggs()) {
-            throw new BusinessException(
-                    "Internal + wasted + fed (" + usage + ") exceeds total eggs (" + production.getTotalEggs() + ")");
-        }
+        production.setPoolProductType(PoolProductType.EGG);
 
         if (request.getAnimalId() != null) {
             Animal animal = animalRepository.findById(request.getAnimalId())
@@ -64,6 +57,7 @@ public class EggProductionService {
                 throw new BusinessException("Egg entry already exists for animal '" + animal.getTagNumber() + "' on " + request.getDate());
             }
             production.setAnimal(animal);
+            production.setPoolSpecies(animal.getSpecies());
         } else {
             Flock flock = flockRepository.findById(request.getFlockId())
                     .orElseThrow(() -> new ResourceNotFoundException("Flock not found with id: " + request.getFlockId()));
@@ -75,10 +69,13 @@ public class EggProductionService {
                 throw new BusinessException("Egg entry already exists for flock '" + flock.getFlockCode() + "' on " + request.getDate());
             }
             production.setFlock(flock);
+            production.setPoolSpecies(flock.getSpecies());
         }
 
         return toResponse(eggRepository.save(production));
     }
+
+    // ============ Read ============
 
     @Transactional(readOnly = true)
     public List<EggProductionResponse> getAll() {
@@ -116,12 +113,15 @@ public class EggProductionService {
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
+    // ============ Update ============
+
     @Transactional
     public EggProductionResponse update(Long id, EggProductionRequest request) {
         EggProduction production = findOrThrow(id);
         Long farmId = farmContext.getCurrentFarmId();
         validateSource(request);
 
+        // Source cannot change
         if (request.getAnimalId() != null) {
             if (production.getAnimal() == null || !production.getAnimal().getId().equals(request.getAnimalId())) {
                 throw new BusinessException("Source cannot be changed. Delete and recreate.");
@@ -132,6 +132,7 @@ public class EggProductionService {
             }
         }
 
+        // Date change → check duplicate
         if (!production.getDate().equals(request.getDate())) {
             if (production.getAnimal() != null
                     && eggRepository.existsByFarmIdAndAnimalIdAndDate(farmId, production.getAnimal().getId(), request.getDate())) {
@@ -146,26 +147,19 @@ public class EggProductionService {
         production.setDate(request.getDate());
         production.setGoodEggs(safe(request.getGoodEggs()));
         production.setCrackedEggs(safe(request.getCrackedEggs()));
-        production.setEggsInternal(safe(request.getEggsInternal()));
-        production.setEggsWasted(safe(request.getEggsWasted()));
-        production.setEggsFed(safe(request.getEggsFed()));
-
-        int usage = safe(request.getEggsInternal())
-                + safe(request.getEggsWasted())
-                + safe(request.getEggsFed());
-        if (usage > production.getTotalEggs()) {
-            throw new BusinessException(
-                    "Internal + wasted + fed (" + usage + ") exceeds total eggs (" + production.getTotalEggs() + ")");
-        }
 
         return toResponse(eggRepository.save(production));
     }
+
+    // ============ Delete ============
 
     @Transactional
     public void delete(Long id) {
         EggProduction p = findOrThrow(id);
         eggRepository.deleteById(p.getId());
     }
+
+    // ============ Summaries ============
 
     @Transactional(readOnly = true)
     public Long getDailyTotal(LocalDate date) {
@@ -186,36 +180,7 @@ public class EggProductionService {
         return eggRepository.sumEggsByFarmBetween(farmContext.getCurrentFarmId(), from, to);
     }
 
-    @Transactional
-    public void incrementEggsSold(Long productionId, Integer amount) {
-        EggProduction p = eggRepository.findById(productionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Egg production not found"));
-
-        int available = p.getAvailableForSale();
-
-        if (amount > available) {
-            throw new BusinessException(
-                    "Cannot sell " + amount + " eggs — only " + available + " available "
-                            + "(produced " + p.getTotalEggs() + ", sold " + p.getEggsSold()
-                            + ", internal " + p.getEggsInternal()
-                            + ", wasted " + p.getEggsWasted()
-                            + ", fed " + p.getEggsFed() + ")");
-        }
-
-        int newSold = (p.getEggsSold() != null ? p.getEggsSold() : 0) + amount;
-        p.setEggsSold(newSold);
-        eggRepository.save(p);
-    }
-
-    @Transactional
-    public void decrementEggsSold(Long productionId, Integer amount) {
-        EggProduction p = eggRepository.findById(productionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Egg production not found"));
-        int currentSold = p.getEggsSold() != null ? p.getEggsSold() : 0;
-        int newSold = Math.max(0, currentSold - amount);
-        p.setEggsSold(newSold);
-        eggRepository.save(p);
-    }
+    // ============ Helpers ============
 
     private EggProduction findOrThrow(Long id) {
         Long farmId = farmContext.getCurrentFarmId();
@@ -238,8 +203,7 @@ public class EggProductionService {
         if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD
                 || animal.getLifecycleStatus() == Animal.LifecycleStatus.SOLD
                 || animal.getLifecycleStatus() == Animal.LifecycleStatus.CULLED) {
-            throw new BusinessException(
-                    "Cannot record eggs for animal with status " + animal.getLifecycleStatus());
+            throw new BusinessException("Cannot record eggs for animal with status " + animal.getLifecycleStatus());
         }
         if (animal.getSpecies() == null || !animal.getSpecies().isEggProducer()) {
             String speciesName = animal.getSpecies() != null ? animal.getSpecies().getName() : "unknown";
@@ -269,14 +233,16 @@ public class EggProductionService {
         response.setTotalEggs(e.getTotalEggs());
         response.setSourceType(e.getSourceType());
         response.setSourceDisplayName(e.getSourceDisplayName());
-        response.setEggsSold(e.getEggsSold());
-        response.setEggsInternal(e.getEggsInternal());
-        response.setEggsWasted(e.getEggsWasted());
-        response.setEggsFed(e.getEggsFed());
-        response.setAvailableForSale(e.getAvailableForSale());
 
         if (e.getAnimal() != null) response.setAnimalId(e.getAnimal().getId());
         if (e.getFlock() != null) response.setFlockId(e.getFlock().getId());
+
+        if (e.getPoolSpecies() != null) {
+            response.setPoolSpeciesId(e.getPoolSpecies().getId());
+            response.setPoolSpeciesCode(e.getPoolSpecies().getCode());
+            response.setPoolSpeciesName(e.getPoolSpecies().getName());
+        }
+        response.setPoolProductType(e.getPoolProductType());
 
         if (e.getEnteredBy() != null) {
             response.setEnteredByUserId(e.getEnteredBy().getId());

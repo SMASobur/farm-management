@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import tc.impact.farmmanagement.entity.PoolProductType;
 import tc.impact.farmmanagement.entity.Sale;
 import java.math.BigDecimal;
 
@@ -46,6 +47,15 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     @Query("SELECT COALESCE(SUM(s.dueAmount), 0) FROM Sale s WHERE s.farm.id = :farmId AND s.dueAmount > 0")
     BigDecimal sumAllDuesByFarm(@Param("farmId") Long farmId);
+
+    @Query("SELECT COALESCE(SUM(s.quantity), 0) FROM Sale s " +
+            "WHERE s.farm.id = :farmId AND s.poolSpecies.id = :speciesId " +
+            "AND s.poolProductType = :productType AND s.date = :date")
+    Double sumQuantityByPool(
+            @Param("farmId") Long farmId,
+            @Param("speciesId") Long speciesId,
+            @Param("productType") PoolProductType productType,
+            @Param("date") LocalDate date);
 
     @Query("SELECT COALESCE(SUM(s.dueAmount), 0) FROM Sale s " +
             "WHERE s.farm.id = :farmId AND s.date BETWEEN :from AND :to")

@@ -20,14 +20,4 @@ public class EggProductionRequest {
 
     @PositiveOrZero
     private Integer crackedEggs;
-
-    // NEW: usage tracking
-    @PositiveOrZero
-    private Integer eggsInternal;
-
-    @PositiveOrZero
-    private Integer eggsWasted;
-
-    @PositiveOrZero
-    private Integer eggsFed;
 }

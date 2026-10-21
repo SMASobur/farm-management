@@ -23,10 +23,6 @@ public class Sale {
     @JoinColumn(name = "farm_id", nullable = false)
     private Farm farm;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "entered_by_user_id")
-    private User enteredBy;
-
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
@@ -41,6 +37,21 @@ public class Sale {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "unit_id", nullable = false)
     private Unit unit;
+
+    /**
+     * The pool this sale is drawn from — null for non-production sales
+     * (e.g., "Animal" sale of a live cow, "Manure" sale).
+     *
+     * For milk sales: (COW, MILK), (BUFFALO, MILK), etc.
+     * For egg sales: (CHICKEN, EGG), (DUCK, EGG), etc.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pool_species_id")
+    private Species poolSpecies;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pool_product_type", length = 20)
+    private PoolProductType poolProductType;
 
     @Column(nullable = false, precision = 12, scale = 3)
     private BigDecimal quantity;
@@ -60,6 +71,10 @@ public class Sale {
     @Column(name = "custom_product_name", length = 100)
     private String customProductName;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "entered_by_user_id")
+    private User enteredBy;
+
     private String notes;
 
     @Column(name = "created_at", updatable = false)
@@ -75,14 +90,6 @@ public class Sale {
     protected void onUpdate() {
         calculateAmounts();
     }
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "milk_production_id")
-    private MilkProduction milkProduction;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "egg_production_id")
-    private EggProduction eggProduction;
 
     public void calculateAmounts() {
         if (quantity == null || unitPrice == null) {

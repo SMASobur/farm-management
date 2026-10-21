@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import tc.impact.farmmanagement.entity.Payment;
+import tc.impact.farmmanagement.entity.PoolProductType;
+import tc.impact.farmmanagement.entity.Sale;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,19 +23,32 @@ public class SaleRequest {
     @NotNull(message = "Category ID is required")
     private Long categoryId;
 
+    // --- Unit Fields ---
     private Long unitId;
 
     @Size(max = 50)
     private String customUnitName;
 
     @Size(max = 50)
-    private String customUnitNameBn;
+    private String customUnitNameBn;             // ← ADDED (fixes line 388)
 
-    @Size(max = 10)
-    private String customUnitAbbreviation;
+    @Size(max = 20)
+    private String customUnitAbbreviation;       // ← ADDED (fixes line 389)
 
     private Boolean saveCustomUnitToUnits;
 
+    // --- Product/Category Custom Fields ---
+    @Size(max = 100)
+    private String customProductName;
+
+    @Size(max = 100)
+    private String customProductNameBn;
+
+    private Boolean saveCustomProductAsCategory;
+
+    private Long customProductDefaultUnitId;
+
+    // --- Quantity & Price ---
     @NotNull(message = "Quantity is required")
     @Positive(message = "Quantity must be positive")
     private BigDecimal quantity;
@@ -42,25 +57,12 @@ public class SaleRequest {
     @Positive(message = "Unit price must be positive")
     private BigDecimal unitPrice;
 
-    @Size(max = 100)
-    private String customProductName;
+    // --- Pool Fields ---
+    private Long poolSpeciesId;
+    private PoolProductType poolProductType;
 
-    @Size(max = 100)
-    private String customProductNameBn;
-
-    private Long customProductDefaultUnitId;
-
-    private Boolean saveCustomProductAsCategory;
-
+    // --- Meta ---
     private String notes;
-
     private BigDecimal initialPayment;
-
     private Payment.PaymentMethod initialPaymentMethod;
-
-    private Long milkProductionId;
-
-    private Long eggProductionId;
-
-
 }

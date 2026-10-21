@@ -34,6 +34,14 @@ public class EggProduction {
     @JoinColumn(name = "flock_id")
     private Flock flock;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "pool_species_id", nullable = false)
+    private Species poolSpecies;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pool_product_type", nullable = false, length = 20)
+    private PoolProductType poolProductType = PoolProductType.EGG;
+
     @Column(nullable = false)
     private LocalDate date;
 
@@ -54,50 +62,14 @@ public class EggProduction {
         this.totalEggs = good + cracked;
     }
 
-    @Column(name = "eggs_sold")
-    private Integer eggsSold = 0;
-
-    @Column(name = "eggs_internal")
-    private Integer eggsInternal = 0;
-
-    @Column(name = "eggs_wasted")
-    private Integer eggsWasted = 0;
-
-    @Column(name = "eggs_fed")
-    private Integer eggsFed = 0;
-
-    public Integer getAvailableForSale() {
-        int total = totalEggs != null ? totalEggs : 0;
-        int usage = getTotalUsage();
-        return total - usage;
-    }
-
-    public Integer getTotalUsage() {
-        int s = eggsSold != null ? eggsSold : 0;
-        int i = eggsInternal != null ? eggsInternal : 0;
-        int w = eggsWasted != null ? eggsWasted : 0;
-        int f = eggsFed != null ? eggsFed : 0;
-        return s + i + w + f;
-    }
-
-    // ---------- Convenience helpers ----------
-
+    // Convenience helpers
     public boolean hasAnimal() { return animal != null; }
     public boolean hasFlock()  { return flock  != null;  }
 
-    /**
-     * Display name regardless of source type.
-     */
     public String getSourceDisplayName() {
         if (animal != null) return animal.getTagNumber() + " (Animal)";
         if (flock != null)  return flock.getFlockCode() + " (Flock)";
         return "Unknown";
-    }
-
-    public Long getSourceId() {
-        if (animal != null) return animal.getId();
-        if (flock != null)  return flock.getId();
-        return null;
     }
 
     public String getSourceType() {
