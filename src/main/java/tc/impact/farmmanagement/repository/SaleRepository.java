@@ -81,6 +81,15 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     BigDecimal sumDueByCustomerAndFarm(@Param("customerId") Long customerId,
                                        @Param("farmId") Long farmId);
 
+    @Query("SELECT COALESCE(SUM(s.quantity), 0) FROM Sale s " +
+            "WHERE s.farm.id = :farmId AND s.category.code = 'MILK' AND s.date <= :date")
+    Double sumMilkSoldUpToDate(@Param("farmId") Long farmId, @Param("date") LocalDate date);
+
+    @Query("SELECT COALESCE(SUM(s.quantity), 0) FROM Sale s " +
+            "WHERE s.farm.id = :farmId AND s.category.code = 'EGG' AND s.date <= :date")
+    Double sumEggsSoldUpToDate(@Param("farmId") Long farmId, @Param("date") LocalDate date);
+
+
     @Query("SELECT COUNT(DISTINCT s.customer.id) FROM Sale s " +
             "WHERE s.farm.id = :farmId AND s.dueAmount > 0")
     long countCustomersWithDues(@Param("farmId") Long farmId);

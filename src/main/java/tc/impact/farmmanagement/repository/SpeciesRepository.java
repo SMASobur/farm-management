@@ -14,6 +14,10 @@ public interface SpeciesRepository extends JpaRepository<Species, Long> {
 
     List<Species> findByFarmIdAndActiveTrueOrderByDisplayOrderAscNameAsc(Long farmId);
 
+    List<Species> findByFarmId(Long farmId);
+
+    List<Species> findByFarmIdAndActiveTrue(Long farmId);
+
     Optional<Species> findByFarmIdAndCode(Long farmId, String code);
 
     boolean existsByFarmIdAndCode(Long farmId, String code);
