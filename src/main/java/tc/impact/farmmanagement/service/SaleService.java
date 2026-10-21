@@ -30,6 +30,11 @@ public class SaleService {
     private final FarmContext farmContext;
     private final UnitRepository unitRepository;
 
+    private final MilkProductionService milkProductionService;
+    private final EggProductionService eggProductionService;
+    private final MilkProductionRepository milkProductionRepository;
+    private final EggProductionRepository eggProductionRepository;
+
     // ============ Create ============
 
     @Transactional
@@ -73,6 +78,56 @@ public class SaleService {
         sale.setNotes(request.getNotes());
         sale.setCustomProductName(customProductName);
         sale.setEnteredBy(farmContext.getCurrentUser());
+        // Validate + link to production if applicable
+        if (request.getMilkProductionId() != null) {
+            MilkProduction production = milkProductionRepository.findById(request.getMilkProductionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Milk production not found"));
+
+            // Verify same farm
+            if (!production.getFarm().getId().equals(farm.getId())) {
+                throw new ResourceNotFoundException("Milk production not found");
+            }
+
+            // Verify the sale category is MILK-type
+            if (!"MILK".equalsIgnoreCase(category.getCode())) {
+                throw new BusinessException(
+                        "Cannot link a " + category.getCode() + " sale to a milk production record");
+            }
+
+            // Verify quantity is available
+            double available = production.getAvailableForSale();
+            if (request.getQuantity().doubleValue() > available) {
+                throw new BusinessException(
+                        "Cannot sell " + request.getQuantity() + "L — only " + available + "L available "
+                                + "(produced " + production.getTotalLiters() + "L, sold "
+                                + production.getLitersSold() + "L)");
+            }
+
+            sale.setMilkProduction(production);
+        }
+
+        if (request.getEggProductionId() != null) {
+            EggProduction production = eggProductionRepository.findById(request.getEggProductionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Egg production not found"));
+
+            if (!production.getFarm().getId().equals(farm.getId())) {
+                throw new ResourceNotFoundException("Egg production not found");
+            }
+
+            if (!"EGG".equalsIgnoreCase(category.getCode())) {
+                throw new BusinessException(
+                        "Cannot link a " + category.getCode() + " sale to an egg production record");
+            }
+
+            int available = production.getAvailableForSale();
+            if (request.getQuantity().intValue() > available) {
+                throw new BusinessException(
+                        "Cannot sell " + request.getQuantity() + " eggs — only " + available + " available "
+                                + "(produced " + production.getTotalEggs() + ", sold " + production.getEggsSold() + ")");
+            }
+
+            sale.setEggProduction(production);
+        }
 
         BigDecimal total = request.getQuantity().multiply(request.getUnitPrice())
                 .setScale(2, RoundingMode.HALF_UP);
@@ -101,6 +156,18 @@ public class SaleService {
                     ? request.getInitialPaymentMethod() : Payment.PaymentMethod.CASH);
             payment.setNotes("Initial payment at sale creation");
             paymentRepository.save(payment);
+        }
+        // After save succeeds
+        if (sale.getMilkProduction() != null) {
+            milkProductionService.incrementLitersSold(
+                    sale.getMilkProduction().getId(),
+                    sale.getQuantity().doubleValue());
+        }
+
+        if (sale.getEggProduction() != null) {
+            eggProductionService.incrementEggsSold(
+                    sale.getEggProduction().getId(),
+                    sale.getQuantity().intValue());
         }
 
         return toResponse(saved);
@@ -198,6 +265,11 @@ public class SaleService {
         Sale sale = findOrThrow(id);
         Long farmId = farmContext.getCurrentFarmId();
 
+        if (sale.getMilkProduction() != null || sale.getEggProduction() != null) {
+            throw new BusinessException(
+                    "Cannot edit a sale linked to a production record. Delete and recreate.");
+        }
+
         if (!sale.getCustomer().getId().equals(request.getCustomerId())) {
             throw new BusinessException("Customer cannot be changed on an existing sale.");
         }
@@ -247,6 +319,18 @@ public class SaleService {
         if (sale.getPaidAmount().signum() > 0) {
             throw new BusinessException("Cannot delete a sale with payments. Delete payments first.");
         }
+
+        if (sale.getMilkProduction() != null) {
+            milkProductionService.decrementLitersSold(
+                    sale.getMilkProduction().getId(),
+                    sale.getQuantity().doubleValue());
+        }
+        if (sale.getEggProduction() != null) {
+            eggProductionService.decrementEggsSold(
+                    sale.getEggProduction().getId(),
+                    sale.getQuantity().intValue());
+        }
+
         List<Payment> payments = paymentRepository.findByFarmIdAndSaleId(
                 farmContext.getCurrentFarmId(), id);
         if (!payments.isEmpty()) {
@@ -452,6 +536,12 @@ public class SaleService {
         if (sale.getEnteredBy() != null) {
             response.setEnteredByUserId(sale.getEnteredBy().getId());
             response.setEnteredByName(UserDisplayUtil.displayName(sale.getEnteredBy()));
+        }
+        if (sale.getMilkProduction() != null) {
+            response.setMilkProductionId(sale.getMilkProduction().getId());
+        }
+        if (sale.getEggProduction() != null) {
+            response.setEggProductionId(sale.getEggProduction().getId());
         }
         return response;
     }

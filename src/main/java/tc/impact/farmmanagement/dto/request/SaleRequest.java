@@ -57,4 +57,10 @@ public class SaleRequest {
     private BigDecimal initialPayment;
 
     private Payment.PaymentMethod initialPaymentMethod;
+
+    private Long milkProductionId;
+
+    private Long eggProductionId;
+
+
 }

@@ -50,6 +50,25 @@ public class MilkProductionService {
         production.setNightLiters(safe(request.getNightLiters()));
         production.setEnteredBy(farmContext.getCurrentUser());
 
+        production.setLitersInternal(safe(request.getLitersInternal()));
+        production.setLitersFed(safe(request.getLitersFed()));
+        production.setLitersWasted(safe(request.getLitersWasted()));
+
+        // Validate usage doesn't exceed total
+        double total = safe(request.getMorningLiters())
+                + safe(request.getNoonLiters())
+                + safe(request.getNightLiters());
+
+        double usage = safe(request.getLitersInternal())
+                + safe(request.getLitersFed())
+                + safe(request.getLitersWasted());
+
+        if (usage > total) {
+            throw new BusinessException(
+                    "Internal + fed + wasted (" + usage + "L) exceeds total produced ("
+                            + total + "L)");
+        }
+
         return toResponse(milkRepository.save(production));
     }
 
@@ -109,6 +128,31 @@ public class MilkProductionService {
         production.setNoonLiters(safe(request.getNoonLiters()));
         production.setNightLiters(safe(request.getNightLiters()));
 
+        production.setLitersInternal(safe(request.getLitersInternal()));
+        production.setLitersFed(safe(request.getLitersFed()));
+        production.setLitersWasted(safe(request.getLitersWasted()));
+
+        // Validate usage doesn't exceed total
+        double total = safe(request.getMorningLiters())
+                + safe(request.getNoonLiters())
+                + safe(request.getNightLiters());
+        double usage = safe(request.getLitersInternal())
+                + safe(request.getLitersFed())
+                + safe(request.getLitersWasted());
+
+        if (usage > total) {
+            throw new BusinessException(
+                    "Internal + fed + wasted (" + usage + "L) exceeds total produced ("
+                            + total + "L)");
+        }
+
+        // Also validate that reducing total doesn't invalidate already-sold amount
+        if (production.getLitersSold() > 0
+                && production.getLitersSold() > production.getAvailableForSale() + production.getLitersSold()) {
+            throw new BusinessException(
+                    "Cannot reduce total below already-sold amount (" + production.getLitersSold() + "L)");
+        }
+
         return toResponse(milkRepository.save(production));
     }
 
@@ -135,6 +179,37 @@ public class MilkProductionService {
         LocalDate from = LocalDate.of(year, month, 1);
         LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
         return milkRepository.sumLitersByFarmBetween(farmContext.getCurrentFarmId(), from, to);
+    }
+
+    @Transactional
+    public void incrementLitersSold(Long productionId, Double amount) {
+        MilkProduction p = milkRepository.findById(productionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Milk production not found"));
+
+        double available = p.getAvailableForSale();
+
+        if (amount > available) {
+            throw new BusinessException(
+                    "Cannot sell " + amount + "L — only " + available + "L available "
+                            + "(produced " + p.getTotalLiters() + "L, sold " + p.getLitersSold()
+                            + "L, internal " + p.getLitersInternal()
+                            + "L, fed " + p.getLitersFed()
+                            + "L, wasted " + p.getLitersWasted() + "L)");
+        }
+
+        double newSold = (p.getLitersSold() != null ? p.getLitersSold() : 0.0) + amount;
+        p.setLitersSold(newSold);
+        milkRepository.save(p);
+    }
+
+    @Transactional
+    public void decrementLitersSold(Long productionId, Double amount) {
+        MilkProduction p = milkRepository.findById(productionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Milk production not found"));
+        double currentSold = p.getLitersSold() != null ? p.getLitersSold() : 0.0;
+        double newSold = Math.max(0.0, currentSold - amount);
+        p.setLitersSold(newSold);
+        milkRepository.save(p);
     }
 
     private MilkProduction findOrThrow(Long id) {
@@ -176,6 +251,12 @@ public class MilkProductionService {
         response.setNoonLiters(m.getNoonLiters());
         response.setNightLiters(m.getNightLiters());
         response.setTotalLiters(m.getTotalLiters());
+        response.setLitersSold(m.getLitersSold());
+        response.setLitersInternal(m.getLitersInternal());
+        response.setLitersFed(m.getLitersFed());
+        response.setLitersWasted(m.getLitersWasted());
+        response.setAvailableForSale(m.getAvailableForSale());
+
         if (m.getEnteredBy() != null) {
             response.setEnteredByUserId(m.getEnteredBy().getId());
             response.setEnteredByName(UserDisplayUtil.displayName(m.getEnteredBy()));

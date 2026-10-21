@@ -9,18 +9,25 @@ import java.time.LocalDate;
 @Data
 public class EggProductionRequest {
 
-    /**
-     * Exactly ONE of animalId or flockId must be provided.
-     */
     private Long animalId;
     private Long flockId;
 
     @NotNull(message = "Date is required")
     private LocalDate date;
 
-    @PositiveOrZero(message = "Good eggs cannot be negative")
+    @PositiveOrZero
     private Integer goodEggs;
 
-    @PositiveOrZero(message = "Cracked eggs cannot be negative")
+    @PositiveOrZero
     private Integer crackedEggs;
+
+    // NEW: usage tracking
+    @PositiveOrZero
+    private Integer eggsInternal;
+
+    @PositiveOrZero
+    private Integer eggsWasted;
+
+    @PositiveOrZero
+    private Integer eggsFed;
 }

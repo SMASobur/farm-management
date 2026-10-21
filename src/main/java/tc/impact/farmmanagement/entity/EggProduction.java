@@ -54,6 +54,32 @@ public class EggProduction {
         this.totalEggs = good + cracked;
     }
 
+    @Column(name = "eggs_sold")
+    private Integer eggsSold = 0;
+
+    @Column(name = "eggs_internal")
+    private Integer eggsInternal = 0;
+
+    @Column(name = "eggs_wasted")
+    private Integer eggsWasted = 0;
+
+    @Column(name = "eggs_fed")
+    private Integer eggsFed = 0;
+
+    public Integer getAvailableForSale() {
+        int total = totalEggs != null ? totalEggs : 0;
+        int usage = getTotalUsage();
+        return total - usage;
+    }
+
+    public Integer getTotalUsage() {
+        int s = eggsSold != null ? eggsSold : 0;
+        int i = eggsInternal != null ? eggsInternal : 0;
+        int w = eggsWasted != null ? eggsWasted : 0;
+        int f = eggsFed != null ? eggsFed : 0;
+        return s + i + w + f;
+    }
+
     // ---------- Convenience helpers ----------
 
     public boolean hasAnimal() { return animal != null; }

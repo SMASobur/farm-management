@@ -38,4 +38,7 @@ public class SaleResponse {
 
     private Long enteredByUserId;
     private String enteredByName;
+
+    private Long milkProductionId;
+    private Long eggProductionId;
 }

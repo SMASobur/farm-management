@@ -76,6 +76,14 @@ public class Sale {
         calculateAmounts();
     }
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "milk_production_id")
+    private MilkProduction milkProduction;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "egg_production_id")
+    private EggProduction eggProduction;
+
     public void calculateAmounts() {
         if (quantity == null || unitPrice == null) {
             this.totalAmount = BigDecimal.ZERO;

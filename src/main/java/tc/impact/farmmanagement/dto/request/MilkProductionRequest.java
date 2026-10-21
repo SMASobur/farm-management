@@ -15,12 +15,21 @@ public class MilkProductionRequest {
     @NotNull(message = "Date is required")
     private LocalDate date;
 
-    @PositiveOrZero(message = "Morning liters cannot be negative")
+    @PositiveOrZero
     private Double morningLiters;
 
-    @PositiveOrZero(message = "Noon liters cannot be negative")
+    @PositiveOrZero
     private Double noonLiters;
 
-    @PositiveOrZero(message = "Night liters cannot be negative")
+    @PositiveOrZero
     private Double nightLiters;
+
+    @PositiveOrZero
+    private Double litersInternal;
+
+    @PositiveOrZero
+    private Double litersFed;
+
+    @PositiveOrZero
+    private Double litersWasted;
 }

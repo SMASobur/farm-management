@@ -17,4 +17,9 @@ public class EggProductionResponse {
     private Integer totalEggs;
     private Long enteredByUserId;
     private String enteredByName;
+    private Integer eggsSold;
+    private Integer eggsInternal;
+    private Integer eggsWasted;
+    private Integer eggsFed;
+    private Integer availableForSale;
 }

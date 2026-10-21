@@ -17,4 +17,9 @@ public class MilkProductionResponse {
     private Double totalLiters;
     private Long enteredByUserId;
     private String enteredByName;
+    private Double litersSold;
+    private Double litersInternal;
+    private Double litersFed;
+    private Double litersWasted;
+    private Double availableForSale;
 }

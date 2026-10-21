@@ -41,6 +41,17 @@ public class EggProductionService {
         production.setGoodEggs(safe(request.getGoodEggs()));
         production.setCrackedEggs(safe(request.getCrackedEggs()));
         production.setEnteredBy(farmContext.getCurrentUser());
+        production.setEggsInternal(safe(request.getEggsInternal()));
+        production.setEggsWasted(safe(request.getEggsWasted()));
+        production.setEggsFed(safe(request.getEggsFed()));
+
+        int usage = safe(request.getEggsInternal())
+                + safe(request.getEggsWasted())
+                + safe(request.getEggsFed());
+        if (usage > production.getTotalEggs()) {
+            throw new BusinessException(
+                    "Internal + wasted + fed (" + usage + ") exceeds total eggs (" + production.getTotalEggs() + ")");
+        }
 
         if (request.getAnimalId() != null) {
             Animal animal = animalRepository.findById(request.getAnimalId())
@@ -135,6 +146,17 @@ public class EggProductionService {
         production.setDate(request.getDate());
         production.setGoodEggs(safe(request.getGoodEggs()));
         production.setCrackedEggs(safe(request.getCrackedEggs()));
+        production.setEggsInternal(safe(request.getEggsInternal()));
+        production.setEggsWasted(safe(request.getEggsWasted()));
+        production.setEggsFed(safe(request.getEggsFed()));
+
+        int usage = safe(request.getEggsInternal())
+                + safe(request.getEggsWasted())
+                + safe(request.getEggsFed());
+        if (usage > production.getTotalEggs()) {
+            throw new BusinessException(
+                    "Internal + wasted + fed (" + usage + ") exceeds total eggs (" + production.getTotalEggs() + ")");
+        }
 
         return toResponse(eggRepository.save(production));
     }
@@ -162,6 +184,37 @@ public class EggProductionService {
         LocalDate from = LocalDate.of(year, month, 1);
         LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
         return eggRepository.sumEggsByFarmBetween(farmContext.getCurrentFarmId(), from, to);
+    }
+
+    @Transactional
+    public void incrementEggsSold(Long productionId, Integer amount) {
+        EggProduction p = eggRepository.findById(productionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Egg production not found"));
+
+        int available = p.getAvailableForSale();
+
+        if (amount > available) {
+            throw new BusinessException(
+                    "Cannot sell " + amount + " eggs — only " + available + " available "
+                            + "(produced " + p.getTotalEggs() + ", sold " + p.getEggsSold()
+                            + ", internal " + p.getEggsInternal()
+                            + ", wasted " + p.getEggsWasted()
+                            + ", fed " + p.getEggsFed() + ")");
+        }
+
+        int newSold = (p.getEggsSold() != null ? p.getEggsSold() : 0) + amount;
+        p.setEggsSold(newSold);
+        eggRepository.save(p);
+    }
+
+    @Transactional
+    public void decrementEggsSold(Long productionId, Integer amount) {
+        EggProduction p = eggRepository.findById(productionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Egg production not found"));
+        int currentSold = p.getEggsSold() != null ? p.getEggsSold() : 0;
+        int newSold = Math.max(0, currentSold - amount);
+        p.setEggsSold(newSold);
+        eggRepository.save(p);
     }
 
     private EggProduction findOrThrow(Long id) {
@@ -216,6 +269,12 @@ public class EggProductionService {
         response.setTotalEggs(e.getTotalEggs());
         response.setSourceType(e.getSourceType());
         response.setSourceDisplayName(e.getSourceDisplayName());
+        response.setEggsSold(e.getEggsSold());
+        response.setEggsInternal(e.getEggsInternal());
+        response.setEggsWasted(e.getEggsWasted());
+        response.setEggsFed(e.getEggsFed());
+        response.setAvailableForSale(e.getAvailableForSale());
+
         if (e.getAnimal() != null) response.setAnimalId(e.getAnimal().getId());
         if (e.getFlock() != null) response.setFlockId(e.getFlock().getId());
 
