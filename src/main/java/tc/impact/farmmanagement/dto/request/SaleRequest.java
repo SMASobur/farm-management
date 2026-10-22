@@ -14,8 +14,11 @@ import java.time.LocalDate;
 @Data
 public class SaleRequest {
 
-    @NotNull(message = "Customer ID is required")
     private Long customerId;
+
+    private String guestCustomerName;
+
+    private String guestCustomerPhone;
 
     @NotNull(message = "Date is required")
     private LocalDate date;

@@ -57,6 +57,15 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
             @Param("productType") PoolProductType productType,
             @Param("date") LocalDate date);
 
+    @Query("SELECT COALESCE(SUM(s.quantity), 0) FROM Sale s " +
+            "WHERE s.farm.id = :farmId AND s.poolSpecies.id = :speciesId " +
+            "AND s.poolProductType = :productType AND s.date <= :date")
+    Double sumQuantityByPoolUpToDate(
+            @Param("farmId") Long farmId,
+            @Param("speciesId") Long speciesId,
+            @Param("productType") PoolProductType productType,
+            @Param("date") LocalDate date);
+
     @Query("SELECT COALESCE(SUM(s.dueAmount), 0) FROM Sale s " +
             "WHERE s.farm.id = :farmId AND s.date BETWEEN :from AND :to")
     BigDecimal sumOutstandingDuesByFarmBetween(@Param("farmId") Long farmId, @Param("from") LocalDate from, @Param("to") LocalDate to);
@@ -80,15 +89,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
             "WHERE s.customer.id = :customerId AND s.farm.id = :farmId AND s.dueAmount > 0")
     BigDecimal sumDueByCustomerAndFarm(@Param("customerId") Long customerId,
                                        @Param("farmId") Long farmId);
-
-    @Query("SELECT COALESCE(SUM(s.quantity), 0) FROM Sale s " +
-            "WHERE s.farm.id = :farmId AND s.category.code = 'MILK' AND s.date <= :date")
-    Double sumMilkSoldUpToDate(@Param("farmId") Long farmId, @Param("date") LocalDate date);
-
-    @Query("SELECT COALESCE(SUM(s.quantity), 0) FROM Sale s " +
-            "WHERE s.farm.id = :farmId AND s.category.code = 'EGG' AND s.date <= :date")
-    Double sumEggsSoldUpToDate(@Param("farmId") Long farmId, @Param("date") LocalDate date);
-
 
     @Query("SELECT COUNT(DISTINCT s.customer.id) FROM Sale s " +
             "WHERE s.farm.id = :farmId AND s.dueAmount > 0")

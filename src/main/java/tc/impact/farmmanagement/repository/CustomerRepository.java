@@ -16,9 +16,13 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     List<Customer> findByFarmIdAndNameContainingIgnoreCase(Long farmId, String namePart);
 
+    List<Customer> findByFarmIdAndGuestFalse(Long farmId);
+
     Optional<Customer> findByFarmIdAndPhone(Long farmId, String phone);
 
     boolean existsByFarmIdAndPhone(Long farmId, String phone);
 
     long countByFarmId(Long farmId);
+
+
 }

@@ -45,4 +45,10 @@ public class Customer {
     protected void onCreate() {
         this.createdAt = LocalDate.now();
     }
+
+    @Column(name = "is_guest")
+    private boolean guest = false;
+
+    public boolean isGuest() { return guest; }
+    public void setGuest(boolean guest) { this.guest = guest; }
 }

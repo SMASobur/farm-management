@@ -58,10 +58,9 @@ public class CustomerService {
     // ============ Read ============
 
     @Transactional(readOnly = true)
-    public List<CustomerResponse> getAll() {
-        Long farmId = farmContext.getCurrentFarmId();
-        return customerRepository.findByFarmId(farmId).stream()
-                .map(this::toResponse).collect(Collectors.toList());
+     public List<CustomerResponse> getAll() {
+        return customerRepository.findByFarmIdAndGuestFalse(farmContext.getCurrentFarmId())
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

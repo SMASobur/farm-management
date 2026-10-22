@@ -38,10 +38,23 @@ public class SaleService {
     public SaleResponse create(SaleRequest request) {
         Farm farm = farmContext.getCurrentFarm();
 
-        Customer customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
-        if (!customer.getFarm().getId().equals(farm.getId())) {
-            throw new ResourceNotFoundException("Customer not found");
+        // 1. Resolve Customer (Handles both regular and guest)
+        Customer customer;
+        if (request.getCustomerId() != null) {
+            customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+            if (!customer.getFarm().getId().equals(farm.getId())) {
+                throw new ResourceNotFoundException("Customer not found");
+            }
+        } else if (request.getGuestCustomerName() != null && !request.getGuestCustomerName().trim().isEmpty()) {
+            customer = new Customer();
+            customer.setFarm(farm);
+            customer.setName(request.getGuestCustomerName().trim());
+            customer.setPhone(request.getGuestCustomerPhone());
+            customer.setGuest(true);
+            customer = customerRepository.save(customer);
+        } else {
+            throw new BusinessException("Customer name or ID is required");
         }
 
         Category category = loadProductCategory(request.getCategoryId(), farm.getId());
@@ -63,7 +76,7 @@ public class SaleService {
             }
         }
 
-        // ============ Pool validation ============
+        // ============ Pool validation (Fixed Duplicate) ============
         Species poolSpecies = null;
         PoolProductType poolProductType = null;
 
@@ -258,7 +271,8 @@ public class SaleService {
                     "Cannot edit a sale linked to a production pool. Delete and recreate.");
         }
 
-        if (!sale.getCustomer().getId().equals(request.getCustomerId())) {
+        // FIX: Safely check customer change. If request.customerId is null (guest), skip this check
+        if (request.getCustomerId() != null && !sale.getCustomer().getId().equals(request.getCustomerId())) {
             throw new BusinessException("Customer cannot be changed on an existing sale.");
         }
 

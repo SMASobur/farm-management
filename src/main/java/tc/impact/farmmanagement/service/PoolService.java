@@ -79,7 +79,9 @@ public class PoolService {
             // --- MILK POOL ---
             if (species.isMilkProducer()) {
                 Double totalProduced = milkProductionRepository.sumLitersBySpeciesUpToDate(farmId, species.getId(), date);
-                Double totalSold = saleRepository.sumMilkSoldUpToDate(farmId, date);
+
+                Double totalSold = saleRepository.sumQuantityByPoolUpToDate(
+                        farmId, species.getId(), PoolProductType.MILK, date);
 
                 List<PoolUsage> usageList = poolUsageRepository.findLatestUsageUpToDate(farmId, species.getId(), PoolProductType.MILK, date);
                 double internalUse = 0, fed = 0, wasted = 0;
@@ -115,7 +117,9 @@ public class PoolService {
             // --- EGG POOL ---
             if (species.isEggProducer()) {
                 Long totalProduced = eggProductionRepository.sumEggsBySpeciesUpToDate(farmId, species.getId(), date);
-                Double totalSold = saleRepository.sumEggsSoldUpToDate(farmId, date);
+
+                Double totalSold = saleRepository.sumQuantityByPoolUpToDate(
+                        farmId, species.getId(), PoolProductType.EGG, date);
 
                 List<PoolUsage> usageList = poolUsageRepository.findLatestUsageUpToDate(farmId, species.getId(), PoolProductType.EGG, date);
                 double internalUse = 0, fed = 0, wasted = 0;
