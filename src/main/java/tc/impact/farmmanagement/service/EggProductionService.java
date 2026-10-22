@@ -53,6 +53,10 @@ public class EggProductionService {
                 throw new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId());
             }
             validateAnimalLaysEggs(animal);
+
+            // NEW: Sanity check for individual animal
+            validateEggYield(request, null);
+
             if (eggRepository.existsByFarmIdAndAnimalIdAndDate(farm.getId(), animal.getId(), request.getDate())) {
                 throw new BusinessException("Egg entry already exists for animal '" + animal.getTagNumber() + "' on " + request.getDate());
             }
@@ -65,6 +69,10 @@ public class EggProductionService {
                 throw new ResourceNotFoundException("Flock not found with id: " + request.getFlockId());
             }
             validateFlockLaysEggs(flock);
+
+            // NEW: Sanity check for flock batch
+            validateEggYield(request, flock);
+
             if (eggRepository.existsByFarmIdAndFlockIdAndDate(farm.getId(), flock.getId(), request.getDate())) {
                 throw new BusinessException("Egg entry already exists for flock '" + flock.getFlockCode() + "' on " + request.getDate());
             }
@@ -120,6 +128,13 @@ public class EggProductionService {
         EggProduction production = findOrThrow(id);
         Long farmId = farmContext.getCurrentFarmId();
         validateSource(request);
+
+        // NEW: Run sanity checks on EVERY update
+        if (production.getAnimal() != null) {
+            validateEggYield(request, null);
+        } else if (production.getFlock() != null) {
+            validateEggYield(request, production.getFlock());
+        }
 
         // Source cannot change
         if (request.getAnimalId() != null) {
@@ -190,6 +205,35 @@ public class EggProductionService {
             throw new ResourceNotFoundException("Egg entry not found with id: " + id);
         }
         return p;
+    }
+
+    // NEW: Extracted helper method to validate egg counts
+    private void validateEggYield(EggProductionRequest request, Flock flock) {
+        int good = safe(request.getGoodEggs());
+        int cracked = safe(request.getCrackedEggs());
+        int totalEggs = good + cracked;
+
+        if (good < 0 || cracked < 0) {
+            throw new BusinessException("Egg counts cannot be negative");
+        }
+        if (totalEggs <= 0) {
+            throw new BusinessException("Total eggs must be greater than 0");
+        }
+
+        if (flock != null) {
+            int maxPossible = flock.getBirdCount() * 2;
+            if (totalEggs > maxPossible) {
+                throw new BusinessException(String.format(
+                        "Unrealistic egg count: %d eggs from %d birds. Most hens lay at most 2 eggs/day.",
+                        totalEggs, flock.getBirdCount()
+                ));
+            }
+        } else {
+            // Individual animal check
+            if (totalEggs > 2) {
+                throw new BusinessException("A single bird cannot lay more than 2 eggs per day.");
+            }
+        }
     }
 
     private void validateSource(EggProductionRequest request) {

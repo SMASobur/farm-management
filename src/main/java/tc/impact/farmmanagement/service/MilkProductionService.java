@@ -15,6 +15,8 @@ import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.AnimalRepository;
 import tc.impact.farmmanagement.repository.MilkProductionRepository;
 import tc.impact.farmmanagement.util.UserDisplayUtil;
+import tc.impact.farmmanagement.util.MilkYieldLimits;
+
 
 import java.time.LocalDate;
 import java.util.List;
@@ -39,6 +41,8 @@ public class MilkProductionService {
             throw new ResourceNotFoundException("Animal not found with id: " + request.getAnimalId());
         }
         validateAnimalCanProduceMilk(animal);
+
+        validateMilkYield(request, animal);
 
         if (milkRepository.existsByFarmIdAndAnimalIdAndDate(farm.getId(), animal.getId(), request.getDate())) {
             throw new BusinessException("Milk entry already exists for " + animal.getTagNumber() + " on " + request.getDate());
@@ -96,6 +100,13 @@ public class MilkProductionService {
     public MilkProductionResponse update(Long id, MilkProductionRequest request) {
         MilkProduction production = findOrThrow(id);
         Long farmId = farmContext.getCurrentFarmId();
+
+        Animal animalToValidate = production.getAnimal();
+        if (!production.getAnimal().getId().equals(request.getAnimalId())) {
+            animalToValidate = animalRepository.findById(request.getAnimalId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Animal not found"));
+        }
+        validateMilkYield(request, animalToValidate);
 
         // If changing animal or date, verify duplicates don't exist
         boolean animalChanged = !production.getAnimal().getId().equals(request.getAnimalId());
@@ -168,6 +179,30 @@ public class MilkProductionService {
         }
         return p;
     }
+
+    private void validateMilkYield(MilkProductionRequest request, Animal animal) {
+        double morning = safe(request.getMorningLiters());
+        double noon = safe(request.getNoonLiters());
+        double night = safe(request.getNightLiters());
+        double totalYield = morning + noon + night;
+
+        if (morning < 0 || noon < 0 || night < 0) {
+            throw new BusinessException("Milk amounts cannot be negative");
+        }
+
+        double maxLimit = MilkYieldLimits.getMaxDailyYield(animal);
+
+        if (totalYield > maxLimit) {
+            throw new BusinessException(String.format(
+                    "Unrealistic milk yield: %.1fL. A %s cannot produce more than %.1fL per day.",
+                    totalYield, animal.getSpecies().getName(), maxLimit
+            ));
+        }
+        if (totalYield <= 0.0) {
+            throw new BusinessException("Total milk yield must be greater than 0");
+        }
+    }
+
 
     private void validateAnimalCanProduceMilk(Animal animal) {
         if (animal.getLifecycleStatus() == Animal.LifecycleStatus.DEAD
