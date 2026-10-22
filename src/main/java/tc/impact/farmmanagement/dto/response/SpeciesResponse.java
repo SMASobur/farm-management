@@ -16,4 +16,7 @@ public class SpeciesResponse {
     private boolean systemDefault;
     private Integer displayOrder;
     private LocalDate createdAt;
+    private Double maxDailyYield;
+
+
 }

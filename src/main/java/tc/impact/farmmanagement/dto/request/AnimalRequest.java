@@ -27,6 +27,8 @@ public class AnimalRequest {
 
     private Boolean customSpeciesMilkProducer;
     private Boolean customSpeciesEggProducer;
+    private Double customMaxDailyYield;
+
 
     private Boolean saveCustomSpecies;
 

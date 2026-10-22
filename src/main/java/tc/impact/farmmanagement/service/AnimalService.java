@@ -279,6 +279,8 @@ public class AnimalService {
         sp.setActive(saveForReuse);
         sp.setSystemDefault(false);
         sp.setDisplayOrder(900);
+        sp.setMaxDailyYield(request.getCustomMaxDailyYield());
+
         return speciesRepository.save(sp);
     }
 

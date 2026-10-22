@@ -189,17 +189,23 @@ public class MilkProductionService {
         if (morning < 0 || noon < 0 || night < 0) {
             throw new BusinessException("Milk amounts cannot be negative");
         }
+        if (totalYield <= 0.0) {
+            throw new BusinessException("Total milk yield must be greater than 0");
+        }
 
-        double maxLimit = MilkYieldLimits.getMaxDailyYield(animal);
+        double maxLimit;
+
+        if (animal.getSpecies() != null && animal.getSpecies().getMaxDailyYield() != null) {
+            maxLimit = animal.getSpecies().getMaxDailyYield();
+        } else {
+            maxLimit = MilkYieldLimits.getMaxDailyYield(animal);
+        }
 
         if (totalYield > maxLimit) {
             throw new BusinessException(String.format(
                     "Unrealistic milk yield: %.1fL. A %s cannot produce more than %.1fL per day.",
                     totalYield, animal.getSpecies().getName(), maxLimit
             ));
-        }
-        if (totalYield <= 0.0) {
-            throw new BusinessException("Total milk yield must be greater than 0");
         }
     }
 

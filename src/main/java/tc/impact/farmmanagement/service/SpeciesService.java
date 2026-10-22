@@ -38,6 +38,8 @@ public class SpeciesService {
         r.setSystemDefault(s.isSystemDefault());
         r.setDisplayOrder(s.getDisplayOrder());
         r.setCreatedAt(s.getCreatedAt());
+        r.setMaxDailyYield(s.getMaxDailyYield());
+
         return r;
     }
 }

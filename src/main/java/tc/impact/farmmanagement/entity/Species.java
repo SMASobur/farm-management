@@ -56,4 +56,10 @@ public class Species {
         this.createdAt = LocalDate.now();
         if (this.displayOrder == null) this.displayOrder = 100;
     }
+
+    @Column(name = "max_daily_yield")
+    private Double maxDailyYield;
+
+    public Double getMaxDailyYield() { return maxDailyYield; }
+    public void setMaxDailyYield(Double maxDailyYield) { this.maxDailyYield = maxDailyYield; }
 }
