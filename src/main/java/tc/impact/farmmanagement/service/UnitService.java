@@ -60,21 +60,44 @@ public class UnitService {
     @Transactional
     public UnitResponse update(Long id, UnitRequest request) {
         Long farmId = farmContext.getCurrentFarmId();
-        Unit unit = findOrThrow(id);
-        String code = normalizeCode(request.getCode());
+        Unit unit = unitRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Unit not found"));
 
-        if (!unit.getCode().equals(code)
-                && unitRepository.existsByFarmIdAndCode(farmId, code)) {
-            throw new BusinessException("Unit with code '" + code + "' already exists");
+        if (!unit.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Unit not found");
         }
 
-        unit.setCode(code);
-        unit.setName(request.getName());
+        unit.setName(request.getName().trim());
         unit.setNameBn(request.getNameBn());
         unit.setAbbreviation(request.getAbbreviation());
-        if (request.getActive() != null) unit.setActive(request.getActive());
-        if (request.getDisplayOrder() != null) unit.setDisplayOrder(request.getDisplayOrder());
 
+        // Only update code if it changed
+        if (request.getCode() != null && !unit.getCode().equals(request.getCode())) {
+            if (unitRepository.findByFarmIdAndCode(farmId, request.getCode()).isPresent()) {
+                throw new BusinessException("Unit code already exists");
+            }
+            unit.setCode(request.getCode().trim().toUpperCase());
+        }
+
+        return toResponse(unitRepository.save(unit));
+    }
+
+    @Transactional
+    public UnitResponse toggleActive(Long id, boolean active) {
+        Long farmId = farmContext.getCurrentFarmId();
+        Unit unit = unitRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Unit not found"));
+
+        if (!unit.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Unit not found");
+        }
+
+        // Protect system defaults from being deactivated
+        if (unit.isSystemDefault() && !active) {
+            throw new BusinessException("Cannot deactivate system default units.");
+        }
+
+        unit.setActive(active);
         return toResponse(unitRepository.save(unit));
     }
 

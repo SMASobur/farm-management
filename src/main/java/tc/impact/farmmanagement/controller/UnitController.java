@@ -37,9 +37,13 @@ public class UnitController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<UnitResponse>> update(
-            @PathVariable Long id, @Valid @RequestBody UnitRequest request) {
+    public ResponseEntity<ApiResponse<UnitResponse>> update(@PathVariable Long id, @Valid @RequestBody UnitRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Unit updated", unitService.update(id, request)));
+    }
+
+    @PatchMapping("/{id}/active")
+    public ResponseEntity<ApiResponse<UnitResponse>> toggleActive(@PathVariable Long id, @RequestParam boolean active) {
+        return ResponseEntity.ok(ApiResponse.success("Status updated", unitService.toggleActive(id, active)));
     }
 
     @DeleteMapping("/{id}")
