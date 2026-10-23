@@ -59,12 +59,12 @@ public class ProductionEventService {
 
         return toResponse(saved);
     }
+
     // ============ Read ============
 
     @Transactional(readOnly = true)
     public List<ProductionEventResponse> getByAnimal(Long animalId) {
         Long farmId = farmContext.getCurrentFarmId();
-        // Validate animal belongs to farm
         loadAnimal(animalId, farmId);
         return eventRepository.findByFarmIdAndAnimalIdOrderByDateDesc(farmId, animalId)
                 .stream()
@@ -100,22 +100,29 @@ public class ProductionEventService {
         }
 
         Animal animal = event.getAnimal();
+        ProductionEvent.EventType oldType = event.getEventType();
+        ProductionEvent.EventType newType = request.getEventType();
 
         // Re-validate: the event type may have changed
-        validateEventForAnimal(request.getEventType(), animal);
-        validateEventHistory(request.getEventType(), animal, farmId, id);   // exclude self
+        validateEventForAnimal(newType, animal);
+        validateEventHistory(newType, animal, farmId, id);   // exclude self
 
         event.setDate(request.getDate() != null ? request.getDate() : event.getDate());
-        event.setEventType(request.getEventType());
+        event.setEventType(newType);
         String title = request.getTitle() != null && !request.getTitle().isBlank()
                 ? request.getTitle().trim()
-                : defaultTitleFor(request.getEventType());
+                : defaultTitleFor(newType);
 
         event.setTitle(title);
         event.setDescription(request.getDescription() != null
                 ? request.getDescription().trim()
                 : null);
         event.setCost(request.getCost());
+
+        // Handle lifecycle transitions if the type changed
+        if (oldType != newType) {
+            applyLifecycleTransitionOnUpdate(oldType, newType, animal);
+        }
 
         return toResponse(eventRepository.save(event));
     }
@@ -125,6 +132,15 @@ public class ProductionEventService {
     @Transactional
     public void delete(Long id) {
         ProductionEvent event = findOrThrow(id);
+        Animal animal = event.getAnimal();
+
+        // If deleting a terminal event, revert the animal to ACTIVE
+        if (event.getEventType() == ProductionEvent.EventType.DEATH
+                || event.getEventType() == ProductionEvent.EventType.SALE) {
+            animal.setLifecycleStatus(Animal.LifecycleStatus.ACTIVE);
+            animalRepository.save(animal);
+        }
+
         eventRepository.deleteById(event.getId());
     }
 
@@ -168,6 +184,7 @@ public class ProductionEventService {
         }
         return response;
     }
+
     private String defaultTitleFor(ProductionEvent.EventType type) {
         return switch (type) {
             case ILLNESS -> "Illness";
@@ -271,6 +288,26 @@ public class ProductionEventService {
 
         if (changed) {
             animalRepository.save(animal);
+        }
+    }
+
+    // Handle updates where an event type changes
+    private void applyLifecycleTransitionOnUpdate(ProductionEvent.EventType oldType,
+                                                  ProductionEvent.EventType newType,
+                                                  Animal animal) {
+        // If it was DEATH or SALE, and it's no longer, revive the animal
+        if ((oldType == ProductionEvent.EventType.DEATH || oldType == ProductionEvent.EventType.SALE)
+                && newType != ProductionEvent.EventType.DEATH
+                && newType != ProductionEvent.EventType.SALE) {
+            animal.setLifecycleStatus(Animal.LifecycleStatus.ACTIVE);
+            animalRepository.save(animal);
+        }
+        // If it becomes DEATH or SALE, apply the status
+        else if (oldType != ProductionEvent.EventType.DEATH
+                && oldType != ProductionEvent.EventType.SALE
+                && (newType == ProductionEvent.EventType.DEATH
+                || newType == ProductionEvent.EventType.SALE)) {
+            applyLifecycleTransition(newType, animal);
         }
     }
 }
