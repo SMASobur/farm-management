@@ -16,4 +16,6 @@ public class SpeciesRequest {
     private boolean milkProducer;
     private boolean eggProducer;
     private Boolean active;
+
+    private String emoji;
 }

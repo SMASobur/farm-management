@@ -40,6 +40,9 @@ public class Species {
     @Column(name = "egg_producer", nullable = false)
     private boolean eggProducer = false;
 
+    @Column(name = "emoji")
+    private String emoji;
+
     @Column(nullable = false)
     private boolean active = true;
 

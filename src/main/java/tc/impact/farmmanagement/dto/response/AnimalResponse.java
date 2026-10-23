@@ -16,6 +16,8 @@ public class AnimalResponse {
     private String speciesName;
     private String speciesNameBn;
 
+    private String speciesEmoji;
+
     private Animal.LifecycleStatus lifecycleStatus;
     private Animal.Gender gender;
     private LocalDate dateOfBirth;

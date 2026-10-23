@@ -307,6 +307,8 @@ public class AnimalService {
         response.setMilkProducer(animal.isMilkProducer());
         response.setEggProducer(animal.isEggProducer());
 
+        response.setSpeciesEmoji(animal.getSpecies().getEmoji());
+
         response.setCurrentlyPregnant(flags.pregnant);
         response.setCurrentlySick(flags.sick);
         response.setCurrentlyMilking(flags.milking);

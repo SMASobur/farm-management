@@ -17,6 +17,7 @@ public class SpeciesResponse {
     private Integer displayOrder;
     private LocalDate createdAt;
     private Double maxDailyYield;
+    private String emoji;
 
 
 }

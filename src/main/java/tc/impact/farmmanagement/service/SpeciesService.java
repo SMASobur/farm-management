@@ -48,6 +48,8 @@ public class SpeciesService {
         species.setActive(request.getActive() != null ? request.getActive() : true);
         species.setSystemDefault(false);
         species.setDisplayOrder(900);
+        species.setEmoji(request.getEmoji());
+
 
         return toResponse(speciesRepository.save(species));
     }
@@ -66,6 +68,8 @@ public class SpeciesService {
         species.setNameBn(request.getNameBn());
         species.setMilkProducer(request.isMilkProducer());
         species.setEggProducer(request.isEggProducer());
+        species.setEmoji(request.getEmoji());
+
 
         // Only update code if it changed AND doesn't conflict
         if (request.getCode() != null && !species.getCode().equals(request.getCode().trim().toUpperCase())) {
@@ -110,6 +114,7 @@ public class SpeciesService {
         r.setDisplayOrder(s.getDisplayOrder());
         r.setCreatedAt(s.getCreatedAt());
         r.setMaxDailyYield(s.getMaxDailyYield());
+        r.setEmoji(s.getEmoji());
         return r;
     }
 }

@@ -33,10 +33,10 @@ public class SaleRequest {
     private String customUnitName;
 
     @Size(max = 50)
-    private String customUnitNameBn;             // ← ADDED (fixes line 388)
+    private String customUnitNameBn;
 
     @Size(max = 20)
-    private String customUnitAbbreviation;       // ← ADDED (fixes line 389)
+    private String customUnitAbbreviation;
 
     private Boolean saveCustomUnitToUnits;
 
@@ -68,4 +68,7 @@ public class SaleRequest {
     private String notes;
     private BigDecimal initialPayment;
     private Payment.PaymentMethod initialPaymentMethod;
+
+
+    private String emoji;
 }
