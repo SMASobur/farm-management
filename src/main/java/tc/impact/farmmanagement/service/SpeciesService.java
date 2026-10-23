@@ -3,8 +3,11 @@ package tc.impact.farmmanagement.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tc.impact.farmmanagement.dto.request.SpeciesRequest;
 import tc.impact.farmmanagement.dto.response.SpeciesResponse;
 import tc.impact.farmmanagement.entity.Species;
+import tc.impact.farmmanagement.exception.BusinessException;
+import tc.impact.farmmanagement.exception.ResourceNotFoundException;
 import tc.impact.farmmanagement.repository.SpeciesRepository;
 
 import java.util.List;
@@ -26,6 +29,74 @@ public class SpeciesService {
         return list.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    @Transactional
+    public SpeciesResponse create(SpeciesRequest request) {
+        Long farmId = farmContext.getCurrentFarmId();
+
+        // Check if code already exists
+        if (speciesRepository.findByFarmIdAndCode(farmId, request.getCode()).isPresent()) {
+            throw new BusinessException("Species with code '" + request.getCode() + "' already exists.");
+        }
+
+        Species species = new Species();
+        species.setFarm(farmContext.getCurrentFarm());
+        species.setCode(request.getCode().trim().toUpperCase());
+        species.setName(request.getName().trim());
+        species.setNameBn(request.getNameBn());
+        species.setMilkProducer(request.isMilkProducer());
+        species.setEggProducer(request.isEggProducer());
+        species.setActive(request.getActive() != null ? request.getActive() : true);
+        species.setSystemDefault(false);
+        species.setDisplayOrder(900);
+
+        return toResponse(speciesRepository.save(species));
+    }
+
+    @Transactional
+    public SpeciesResponse update(Long id, SpeciesRequest request) {
+        Long farmId = farmContext.getCurrentFarmId();
+        Species species = speciesRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Species not found"));
+
+        if (!species.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Species not found");
+        }
+
+        species.setName(request.getName().trim());
+        species.setNameBn(request.getNameBn());
+        species.setMilkProducer(request.isMilkProducer());
+        species.setEggProducer(request.isEggProducer());
+
+        // Only update code if it changed AND doesn't conflict
+        if (request.getCode() != null && !species.getCode().equals(request.getCode().trim().toUpperCase())) {
+            String newCode = request.getCode().trim().toUpperCase();
+            if (speciesRepository.findByFarmIdAndCode(farmId, newCode).isPresent()) {
+                throw new BusinessException("Species with code '" + newCode + "' already exists.");
+            }
+            species.setCode(newCode);
+        }
+
+        if (request.getActive() != null) {
+            species.setActive(request.getActive());
+        }
+
+        return toResponse(speciesRepository.save(species));
+    }
+
+    @Transactional
+    public SpeciesResponse toggleActive(Long id, boolean active) {
+        Long farmId = farmContext.getCurrentFarmId();
+        Species species = speciesRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Species not found"));
+
+        if (!species.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Species not found");
+        }
+
+        species.setActive(active);
+        return toResponse(speciesRepository.save(species));
+    }
+
     private SpeciesResponse toResponse(Species s) {
         SpeciesResponse r = new SpeciesResponse();
         r.setId(s.getId());
@@ -39,7 +110,6 @@ public class SpeciesService {
         r.setDisplayOrder(s.getDisplayOrder());
         r.setCreatedAt(s.getCreatedAt());
         r.setMaxDailyYield(s.getMaxDailyYield());
-
         return r;
     }
 }
