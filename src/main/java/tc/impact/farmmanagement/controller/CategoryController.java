@@ -55,4 +55,10 @@ public class CategoryController {
         categoryService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Category deleted", null));
     }
+
+    @PatchMapping("/{id}/active")
+    public ResponseEntity<ApiResponse<CategoryResponse>> toggleActive(
+            @PathVariable Long id, @RequestParam boolean active) {
+        return ResponseEntity.ok(ApiResponse.success("Status updated", categoryService.toggleActive(id, active)));
+    }
 }

@@ -115,6 +115,18 @@ public class CategoryService {
     }
 
     @Transactional
+    public CategoryResponse toggleActive(Long id, boolean active) {
+        Category category = findOrThrow(id);
+
+        if (category.isSystemDefault() && !active) {
+            throw new BusinessException("Cannot deactivate system category '" + category.getName() + "'. You can only edit it.");
+        }
+
+        category.setActive(active);
+        return toResponse(categoryRepository.save(category));
+    }
+
+    @Transactional
     public void delete(Long id) {
         Category category = findOrThrow(id);
 

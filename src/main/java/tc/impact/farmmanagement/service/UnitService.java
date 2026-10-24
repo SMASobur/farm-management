@@ -9,6 +9,8 @@ import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.entity.Unit;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
+import tc.impact.farmmanagement.repository.ExpenseRepository;
+import tc.impact.farmmanagement.repository.SaleRepository;
 import tc.impact.farmmanagement.repository.UnitRepository;
 
 import java.util.List;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 public class UnitService {
 
     private final UnitRepository unitRepository;
+    private final SaleRepository saleRepository;
     private final FarmContext farmContext;
 
     @Transactional
@@ -104,11 +107,21 @@ public class UnitService {
     @Transactional
     public void delete(Long id) {
         Unit unit = findOrThrow(id);
+
         if (unit.isSystemDefault()) {
             throw new BusinessException(
-                    "Cannot delete system unit '" + unit.getCode() +
-                            "'. Deactivate it instead (set active=false).");
+                    "Cannot delete system unit '" + unit.getCode() + "'. Deactivate it instead.");
         }
+
+        // Check if the unit is used in any sales or expenses
+        long saleCount = saleRepository.countByUnitId(id);
+
+        if (saleCount > 0) {
+            throw new BusinessException(
+                    "Cannot delete unit '" + unit.getName() +
+                            "'. It is used by " + saleCount + " sale(s). Deactivate it instead.");
+        }
+
         unitRepository.deleteById(id);
     }
 

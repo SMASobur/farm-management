@@ -25,22 +25,25 @@ public class CustomerTypeController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<CustomerTypeResponse>> create(
-            @Valid @RequestBody CustomerTypeRequest request) {
+    public ResponseEntity<ApiResponse<CustomerTypeResponse>> create(@Valid @RequestBody CustomerTypeRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Customer type created", customerTypeService.create(request)));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<CustomerTypeResponse>> update(
-            @PathVariable Long id,
-            @Valid @RequestBody CustomerTypeRequest request) {
+            @PathVariable Long id, @Valid @RequestBody CustomerTypeRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Customer type updated", customerTypeService.update(id, request)));
     }
 
     @PatchMapping("/{id}/active")
     public ResponseEntity<ApiResponse<CustomerTypeResponse>> toggleActive(
-            @PathVariable Long id,
-            @RequestParam boolean active) {
+            @PathVariable Long id, @RequestParam boolean active) {
         return ResponseEntity.ok(ApiResponse.success("Status updated", customerTypeService.toggleActive(id, active)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        customerTypeService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("Customer type deleted", null));
     }
 }

@@ -9,6 +9,7 @@ import tc.impact.farmmanagement.entity.CustomerType;
 import tc.impact.farmmanagement.entity.Farm;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
+import tc.impact.farmmanagement.repository.CustomerRepository;
 import tc.impact.farmmanagement.repository.CustomerTypeRepository;
 
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public class CustomerTypeService {
 
     private final CustomerTypeRepository customerTypeRepository;
+    private final CustomerRepository customerRepository;
     private final FarmContext farmContext;
 
     @Transactional(readOnly = true)
@@ -35,7 +37,6 @@ public class CustomerTypeService {
         Farm farm = farmContext.getCurrentFarm();
         Long farmId = farm.getId();
 
-        // Check if code already exists
         String normalizedCode = request.getCode().trim().toUpperCase();
         if (customerTypeRepository.findByFarmIdAndCode(farmId, normalizedCode).isPresent()) {
             throw new BusinessException("Customer type code '" + normalizedCode + "' already exists.");
@@ -92,6 +93,33 @@ public class CustomerTypeService {
 
         type.setActive(active);
         return toResponse(customerTypeRepository.save(type));
+    }
+
+    // ADDED: Safe delete method
+    @Transactional
+    public void delete(Long id) {
+        Long farmId = farmContext.getCurrentFarmId();
+        CustomerType type = customerTypeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer type not found"));
+
+        if (!type.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Customer type not found");
+        }
+
+        if (type.isSystemDefault()) {
+            throw new BusinessException("Cannot delete system customer type '" + type.getName() + "'. Deactivate it instead.");
+        }
+
+        // Check if any customers are using this type
+        long customerCount = customerRepository.countByCustomerTypeId(id);
+
+        if (customerCount > 0) {
+            throw new BusinessException(
+                    "Cannot delete customer type '" + type.getName() +
+                            "'. It is used by " + customerCount + " customer(s). Deactivate it instead.");
+        }
+
+        customerTypeRepository.deleteById(id);
     }
 
     private CustomerTypeResponse toResponse(CustomerType t) {

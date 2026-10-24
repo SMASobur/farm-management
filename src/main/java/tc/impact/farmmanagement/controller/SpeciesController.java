@@ -42,4 +42,10 @@ public class SpeciesController {
             @RequestParam boolean active) {
         return ResponseEntity.ok(ApiResponse.success("Status updated", speciesService.toggleActive(id, active)));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        speciesService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("Species deleted", null));
+    }
 }

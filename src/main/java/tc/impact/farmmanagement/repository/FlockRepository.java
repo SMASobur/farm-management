@@ -21,4 +21,6 @@ public interface FlockRepository extends JpaRepository<Flock, Long> {
     boolean existsByFarmIdAndFlockCode(Long farmId, String flockCode);
 
     long countByFarmIdAndStatus(Long farmId, Flock.FlockStatus status);
+
+    long countBySpeciesId(Long speciesId);
 }

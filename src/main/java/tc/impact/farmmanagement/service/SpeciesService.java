@@ -8,6 +8,8 @@ import tc.impact.farmmanagement.dto.response.SpeciesResponse;
 import tc.impact.farmmanagement.entity.Species;
 import tc.impact.farmmanagement.exception.BusinessException;
 import tc.impact.farmmanagement.exception.ResourceNotFoundException;
+import tc.impact.farmmanagement.repository.AnimalRepository;
+import tc.impact.farmmanagement.repository.FlockRepository;
 import tc.impact.farmmanagement.repository.SpeciesRepository;
 
 import java.util.List;
@@ -19,6 +21,8 @@ public class SpeciesService {
 
     private final SpeciesRepository speciesRepository;
     private final FarmContext farmContext;
+    private final AnimalRepository animalRepository;
+    private final FlockRepository flockRepository;
 
     @Transactional(readOnly = true)
     public List<SpeciesResponse> getAll(boolean activeOnly) {
@@ -32,8 +36,6 @@ public class SpeciesService {
     @Transactional
     public SpeciesResponse create(SpeciesRequest request) {
         Long farmId = farmContext.getCurrentFarmId();
-
-        // Check if code already exists
         if (speciesRepository.findByFarmIdAndCode(farmId, request.getCode()).isPresent()) {
             throw new BusinessException("Species with code '" + request.getCode() + "' already exists.");
         }
@@ -49,7 +51,6 @@ public class SpeciesService {
         species.setSystemDefault(false);
         species.setDisplayOrder(900);
         species.setEmoji(request.getEmoji());
-
 
         return toResponse(speciesRepository.save(species));
     }
@@ -70,8 +71,6 @@ public class SpeciesService {
         species.setEggProducer(request.isEggProducer());
         species.setEmoji(request.getEmoji());
 
-
-        // Only update code if it changed AND doesn't conflict
         if (request.getCode() != null && !species.getCode().equals(request.getCode().trim().toUpperCase())) {
             String newCode = request.getCode().trim().toUpperCase();
             if (speciesRepository.findByFarmIdAndCode(farmId, newCode).isPresent()) {
@@ -99,6 +98,34 @@ public class SpeciesService {
 
         species.setActive(active);
         return toResponse(speciesRepository.save(species));
+    }
+
+    // ADDED: Safe delete method
+    @Transactional
+    public void delete(Long id) {
+        Long farmId = farmContext.getCurrentFarmId();
+        Species species = speciesRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Species not found"));
+
+        if (!species.getFarm().getId().equals(farmId)) {
+            throw new ResourceNotFoundException("Species not found");
+        }
+
+        if (species.isSystemDefault()) {
+            throw new BusinessException("Cannot delete system species '" + species.getName() + "'. Deactivate it instead.");
+        }
+
+        // Check if any animals or flocks are using this species
+        long animalCount = animalRepository.countBySpeciesId(id);
+        long flockCount = flockRepository.countBySpeciesId(id);
+
+        if (animalCount > 0 || flockCount > 0) {
+            throw new BusinessException(
+                    "Cannot delete species '" + species.getName() +
+                            "'. It is used by " + animalCount + " animal(s) and " + flockCount + " batch(es). Deactivate it instead.");
+        }
+
+        speciesRepository.deleteById(id);
     }
 
     private SpeciesResponse toResponse(Species s) {
